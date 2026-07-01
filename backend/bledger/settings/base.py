@@ -8,7 +8,7 @@ standalone.py / connected.py.
 """
 from pathlib import Path
 
-import environ
+import environ # type: ignore
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent  # .../backend
 
@@ -40,6 +40,7 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     "rest_framework",
+    "rest_framework.authtoken",
     "corsheaders",
     "django_filters",
 ]
@@ -48,7 +49,7 @@ THIRD_PARTY_APPS = [
 # Bledger_Design_v0.5.docx, "Next Steps"). Only `core` exists so far.
 LOCAL_APPS = [
     "apps.core",
-    # "apps.auth_users",
+    "apps.auth_users",
     # "apps.inventory",
     # "apps.sales",
     # "apps.printing",

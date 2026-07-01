@@ -11,10 +11,14 @@ from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
 
+from apps.auth_users.urls import auth_urlpatterns, setup_urlpatterns, user_urlpatterns
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/", include("apps.core.urls")),
-    # path("api/v1/auth/", include("apps.auth_users.urls")),
+    path("api/v1/auth/", include(auth_urlpatterns)),
+    path("api/v1/setup/", include(setup_urlpatterns)),
+    path("api/v1/users/", include(user_urlpatterns)),
     # path("api/v1/", include("apps.inventory.urls")),
     # path("api/v1/", include("apps.sales.urls")),
     # path("api/v1/", include("apps.suppliers.urls")),
