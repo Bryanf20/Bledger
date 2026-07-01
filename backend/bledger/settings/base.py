@@ -50,7 +50,7 @@ THIRD_PARTY_APPS = [
 LOCAL_APPS = [
     "apps.core",
     "apps.auth_users",
-    # "apps.inventory",
+    "apps.inventory",
     # "apps.sales",
     # "apps.printing",
     # "apps.suppliers",
@@ -96,10 +96,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "bledger.wsgi.application"
 ASGI_APPLICATION = "bledger.asgi.application"
 
-# Switches to "auth_users.BledgerUser" once that app is scaffolded (next
-# step per the design doc). Left as Django's default for now so this
-# skeleton runs and migrates cleanly on its own.
-AUTH_USER_MODEL = "auth.User"
+AUTH_USER_MODEL = "auth_users.BledgerUser"
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

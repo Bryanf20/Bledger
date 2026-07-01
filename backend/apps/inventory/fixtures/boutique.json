@@ -1,0 +1,20 @@
+{
+  "categories": [
+    {"name": "Men's Wear", "sort_order": 1},
+    {"name": "Women's Wear", "sort_order": 2},
+    {"name": "Footwear", "sort_order": 3},
+    {"name": "Accessories", "sort_order": 4}
+  ],
+  "products": [
+    {"name": "Men's T-shirt (assorted)", "category": "Men's Wear", "unit": "piece", "retail_price": 3500, "bulk_price": 3000, "bulk_min_qty": 6, "stock_level": 24, "low_stock_threshold": 6},
+    {"name": "Men's jeans", "category": "Men's Wear", "unit": "piece", "retail_price": 9500, "stock_level": 12, "low_stock_threshold": 3},
+    {"name": "Men's shirt", "category": "Men's Wear", "unit": "piece", "retail_price": 6500, "stock_level": 15, "low_stock_threshold": 4},
+    {"name": "Ankara dress", "category": "Women's Wear", "unit": "piece", "retail_price": 12000, "stock_level": 10, "low_stock_threshold": 3},
+    {"name": "Women's blouse", "category": "Women's Wear", "unit": "piece", "retail_price": 5500, "stock_level": 18, "low_stock_threshold": 4},
+    {"name": "Women's skirt", "category": "Women's Wear", "unit": "piece", "retail_price": 6000, "stock_level": 14, "low_stock_threshold": 3},
+    {"name": "Sneakers", "category": "Footwear", "unit": "pair", "retail_price": 13500, "stock_level": 8, "low_stock_threshold": 2},
+    {"name": "Sandals", "category": "Footwear", "unit": "pair", "retail_price": 5000, "stock_level": 16, "low_stock_threshold": 4},
+    {"name": "Handbag", "category": "Accessories", "unit": "piece", "retail_price": 8500, "stock_level": 10, "low_stock_threshold": 3},
+    {"name": "Belt", "category": "Accessories", "unit": "piece", "retail_price": 2500, "stock_level": 20, "low_stock_threshold": 5}
+  ]
+}

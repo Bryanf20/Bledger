@@ -1,0 +1,16 @@
+{
+  "categories": [
+    {"name": "Phones & Accessories", "sort_order": 1},
+    {"name": "Small Electronics", "sort_order": 2}
+  ],
+  "products": [
+    {"name": "Phone charger", "category": "Phones & Accessories", "unit": "piece", "retail_price": 3000, "bulk_price": 2600, "bulk_min_qty": 5, "stock_level": 20, "low_stock_threshold": 5},
+    {"name": "Earphones", "category": "Phones & Accessories", "unit": "piece", "retail_price": 2500, "stock_level": 25, "low_stock_threshold": 6},
+    {"name": "Power bank 10000mAh", "category": "Phones & Accessories", "unit": "piece", "retail_price": 9500, "stock_level": 10, "low_stock_threshold": 3},
+    {"name": "USB cable", "category": "Phones & Accessories", "unit": "piece", "retail_price": 1500, "stock_level": 30, "low_stock_threshold": 8},
+    {"name": "Phone case (assorted)", "category": "Phones & Accessories", "unit": "piece", "retail_price": 2000, "stock_level": 25, "low_stock_threshold": 6},
+    {"name": "Memory card 32GB", "category": "Phones & Accessories", "unit": "piece", "retail_price": 4500, "stock_level": 12, "low_stock_threshold": 3},
+    {"name": "Bluetooth speaker", "category": "Small Electronics", "unit": "piece", "retail_price": 12000, "stock_level": 8, "low_stock_threshold": 2},
+    {"name": "Rechargeable torch", "category": "Small Electronics", "unit": "piece", "retail_price": 3500, "stock_level": 15, "low_stock_threshold": 4}
+  ]
+}

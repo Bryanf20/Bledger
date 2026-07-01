@@ -19,7 +19,7 @@ urlpatterns = [
     path("api/v1/auth/", include(auth_urlpatterns)),
     path("api/v1/setup/", include(setup_urlpatterns)),
     path("api/v1/users/", include(user_urlpatterns)),
-    # path("api/v1/", include("apps.inventory.urls")),
+    path("api/v1/", include("apps.inventory.urls")),
     # path("api/v1/", include("apps.sales.urls")),
     # path("api/v1/", include("apps.suppliers.urls")),
     # path("api/v1/dashboard/", include("apps.dashboard.urls")),

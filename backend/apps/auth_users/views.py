@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.permissions import IsOwner
+from apps.inventory.services import TemplateNotFoundError, load_template
 
 from .models import Branch
 from .serializers import (
@@ -115,24 +116,27 @@ class SetupView(APIView):
 
 class LoadTemplateView(APIView):
     """
-    POST /api/v1/setup/load-template/ — loads fixture data for the
-    chosen product template (Provision Store / Boutique / Cosmetics /
-    Electronics — design doc B.7 step 2).
+    POST /api/v1/setup/load-template/
+    Body: {"template_key": "provision-store"}
 
-    Stubbed for now: ProductTemplate and the fixture files live in the
-    inventory app, which isn't built yet (next in the build order per
-    the design doc). Returns 503, the same pattern used for the
-    Phase-2 sync endpoints, so the route exists and the frontend can be
-    wired up without waiting on this backend piece.
+    Owner-only (same gate as the rest of the setup wizard — a fresh
+    install only has the just-created owner authenticated at this point
+    anyway). Loads the chosen ProductTemplate's categories/products onto
+    request.branch_id via apps.inventory.services.load_template().
     """
-
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsOwner]
 
     def post(self, request):
-        return Response(
-            {"detail": "Product templates are not available until the inventory app is built."},
-            status=status.HTTP_503_SERVICE_UNAVAILABLE,
-        )
+        template_key = request.data.get("template_key")
+        if not template_key:
+            return Response({"detail": "template_key is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            result = load_template(template_key, request.branch_id)
+        except TemplateNotFoundError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(result, status=status.HTTP_201_CREATED)
 
 
 class StaffUserCreateView(APIView):

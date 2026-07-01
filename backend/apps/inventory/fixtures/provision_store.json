@@ -1,0 +1,24 @@
+{
+  "categories": [
+    {"name": "Grains & Staples", "sort_order": 1},
+    {"name": "Cooking Oil", "sort_order": 2},
+    {"name": "Seasoning", "sort_order": 3},
+    {"name": "Toiletries", "sort_order": 4},
+    {"name": "Drinks", "sort_order": 5},
+    {"name": "Canned Goods", "sort_order": 6}
+  ],
+  "products": [
+    {"name": "Mama Gold rice 5kg", "category": "Grains & Staples", "unit": "bag", "retail_price": 4500, "bulk_price": 4000, "bulk_min_qty": 12, "stock_level": 20, "low_stock_threshold": 5},
+    {"name": "Vegetable oil 5L", "category": "Cooking Oil", "unit": "bottle", "retail_price": 6200, "stock_level": 15, "low_stock_threshold": 4},
+    {"name": "Sugar 2kg", "category": "Grains & Staples", "unit": "bag", "retail_price": 1800, "stock_level": 10, "low_stock_threshold": 5},
+    {"name": "Pasta 500g", "category": "Grains & Staples", "unit": "pack", "retail_price": 650, "stock_level": 60, "low_stock_threshold": 15},
+    {"name": "Maggi cube \u00d7100", "category": "Seasoning", "unit": "pack", "retail_price": 1500, "stock_level": 20, "low_stock_threshold": 5},
+    {"name": "Omo washing powder 1kg", "category": "Toiletries", "unit": "pack", "retail_price": 2200, "stock_level": 15, "low_stock_threshold": 5},
+    {"name": "Lifebuoy soap \u00d76", "category": "Toiletries", "unit": "pack", "retail_price": 1900, "stock_level": 15, "low_stock_threshold": 5},
+    {"name": "Sardines \u00d748", "category": "Canned Goods", "unit": "carton", "retail_price": 14500, "bulk_price": 13500, "bulk_min_qty": 2, "stock_level": 6, "low_stock_threshold": 2},
+    {"name": "Indomie noodles \u00d740", "category": "Grains & Staples", "unit": "carton", "retail_price": 8500, "bulk_price": 8000, "bulk_min_qty": 3, "stock_level": 10, "low_stock_threshold": 3},
+    {"name": "Malta drink \u00d724", "category": "Drinks", "unit": "crate", "retail_price": 8400, "bulk_price": 7800, "bulk_min_qty": 3, "stock_level": 20, "low_stock_threshold": 5},
+    {"name": "Bottled water 1.5L \u00d712", "category": "Drinks", "unit": "pack", "retail_price": 3000, "stock_level": 25, "low_stock_threshold": 6},
+    {"name": "Tomato paste \u00d750", "category": "Canned Goods", "unit": "carton", "retail_price": 9500, "stock_level": 8, "low_stock_threshold": 2}
+  ]
+}

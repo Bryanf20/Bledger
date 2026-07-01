@@ -37,3 +37,4 @@ class BledgerUserAdmin(UserAdmin):
             },
         ),
     )
+    

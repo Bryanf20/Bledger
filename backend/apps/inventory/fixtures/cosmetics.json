@@ -1,0 +1,20 @@
+{
+  "categories": [
+    {"name": "Skincare", "sort_order": 1},
+    {"name": "Hair Care", "sort_order": 2},
+    {"name": "Makeup", "sort_order": 3},
+    {"name": "Fragrance", "sort_order": 4}
+  ],
+  "products": [
+    {"name": "Body lotion 500ml", "category": "Skincare", "unit": "bottle", "retail_price": 3200, "bulk_price": 2900, "bulk_min_qty": 6, "stock_level": 18, "low_stock_threshold": 5},
+    {"name": "Shea butter 250g", "category": "Skincare", "unit": "tub", "retail_price": 2000, "stock_level": 20, "low_stock_threshold": 5},
+    {"name": "Facial cleanser", "category": "Skincare", "unit": "bottle", "retail_price": 4500, "stock_level": 12, "low_stock_threshold": 3},
+    {"name": "Hair relaxer kit", "category": "Hair Care", "unit": "kit", "retail_price": 5500, "stock_level": 10, "low_stock_threshold": 3},
+    {"name": "Hair extension (weave)", "category": "Hair Care", "unit": "pack", "retail_price": 9000, "stock_level": 8, "low_stock_threshold": 2},
+    {"name": "Hair oil 200ml", "category": "Hair Care", "unit": "bottle", "retail_price": 2500, "stock_level": 15, "low_stock_threshold": 4},
+    {"name": "Foundation", "category": "Makeup", "unit": "piece", "retail_price": 6000, "stock_level": 10, "low_stock_threshold": 3},
+    {"name": "Lip gloss", "category": "Makeup", "unit": "piece", "retail_price": 2200, "stock_level": 20, "low_stock_threshold": 5},
+    {"name": "Nail polish", "category": "Makeup", "unit": "piece", "retail_price": 1500, "stock_level": 25, "low_stock_threshold": 6},
+    {"name": "Perfume 50ml", "category": "Fragrance", "unit": "bottle", "retail_price": 8500, "stock_level": 10, "low_stock_threshold": 3}
+  ]
+}
