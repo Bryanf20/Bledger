@@ -51,12 +51,11 @@ LOCAL_APPS = [
     "apps.core",
     "apps.auth_users",
     "apps.inventory",
-    "apps.sync",
     "apps.sales",
     # "apps.printing",
-    # "apps.suppliers",
+    "apps.suppliers",
     # "apps.dashboard",
-    # "apps.sync",
+    "apps.sync",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
