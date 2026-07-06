@@ -1,0 +1,209 @@
+from django.db.models import Count, F, IntegerField, Sum, Value
+from django.db.models.functions import Coalesce, TruncDay, TruncHour
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from apps.core.permissions import IsCashierOrAbove, IsManagerOrOwner
+from apps.core.utils.xaf import round_xaf
+from apps.inventory.models import Product
+from apps.sales.models import Sale, SaleLineItem
+
+from .serializers import (
+    DashboardSummarySerializer,
+    PaymentBreakdownSerializer,
+    SalesChartPointSerializer,
+    StockAlertSerializer,
+    TopProductSerializer,
+)
+from .services import period_range, previous_period_range, resolve_period
+
+
+def _branch_sales(request, start, end):
+    """Completed sales for the caller's branch within [start, end).
+    Voided sales are excluded from every dashboard figure — they never
+    happened as far as revenue/reporting is concerned (contrast the
+    sales app itself, which keeps the voided Sale row for audit).
+    request.branch_id is stamped by DeploymentContextMiddleware from
+    settings.BRANCH_ID (apps.core.middleware) — same as every other
+    app's BranchScopedQuerysetMixin."""
+    return Sale.objects.filter(
+        branch_id=request.branch_id,
+        status=Sale.COMPLETED,
+        created_at__gte=start,
+        created_at__lt=end,
+    )
+
+
+class SalesSummaryView(APIView):
+    """GET /api/v1/dashboard/summary/?period=today|week|month
+
+    KPI strip: revenue, transaction count, average sale, top product —
+    each with a period-over-period delta (design doc B.5)."""
+
+    permission_classes = [IsManagerOrOwner]
+
+    def get(self, request):
+        period = resolve_period(request.query_params.get("period"))
+        start, end = period_range(period)
+        prev_start, prev_end = previous_period_range(period, start, end)
+
+        sales = _branch_sales(request, start, end)
+        prev_sales = _branch_sales(request, prev_start, prev_end)
+
+        agg = sales.aggregate(
+            revenue=Coalesce(Sum("total_amount"), Value(0, output_field=IntegerField())),
+            transaction_count=Count("id"),
+        )
+        prev_agg = prev_sales.aggregate(
+            revenue=Coalesce(Sum("total_amount"), Value(0, output_field=IntegerField())),
+            transaction_count=Count("id"),
+        )
+
+        revenue = agg["revenue"]
+        transaction_count = agg["transaction_count"]
+        average_sale = round_xaf(revenue / transaction_count) if transaction_count else 0
+
+        prev_revenue = prev_agg["revenue"]
+        revenue_change_pct = (
+            float((revenue - prev_revenue) / prev_revenue * 100) if prev_revenue else None
+        )
+
+        top_line = (
+            SaleLineItem.objects.filter(sale__in=sales)
+            .values("product__name")
+            .annotate(units=Sum("quantity"))
+            .order_by("-units")
+            .first()
+        )
+
+        data = {
+            "period": period,
+            "revenue": revenue,
+            "revenue_change_pct": revenue_change_pct,
+            "transaction_count": transaction_count,
+            "transaction_count_change": transaction_count - prev_agg["transaction_count"],
+            "average_sale": average_sale,
+            "top_product_name": top_line["product__name"] if top_line else None,
+        }
+        return Response(DashboardSummarySerializer(data).data)
+
+
+class TopProductsView(APIView):
+    """GET /api/v1/dashboard/top-products/?period=today|week|month&limit=10
+
+    Not paginated — this is a small ranked list (design doc shows top 3
+    on the dashboard card), not a browsable collection, so DRF's
+    pagination classes don't apply here and the annotate()-plus-pagination
+    ordering gotcha (see suppliers.SupplierViewSet.get_queryset()) doesn't
+    come up. `limit` is capped so a caller can't force an unbounded
+    aggregate scan."""
+
+    permission_classes = [IsManagerOrOwner]
+
+    def get(self, request):
+        period = resolve_period(request.query_params.get("period"))
+        start, end = period_range(period)
+        limit = min(int(request.query_params.get("limit", 10)), 50)
+
+        sales = _branch_sales(request, start, end)
+        rows = (
+            SaleLineItem.objects.filter(sale__in=sales)
+            .values("product_id", "product__name")
+            .annotate(units_sold=Sum("quantity"), revenue=Sum("line_total"))
+            .order_by("-revenue")[:limit]
+        )
+
+        data = [
+            {
+                "rank": i + 1,
+                "product_id": row["product_id"],
+                "product_name": row["product__name"],
+                "units_sold": row["units_sold"],
+                "revenue": row["revenue"],
+            }
+            for i, row in enumerate(rows)
+        ]
+        return Response(TopProductSerializer(data, many=True).data)
+
+
+class PaymentBreakdownView(APIView):
+    """GET /api/v1/dashboard/payment-breakdown/?period=today|week|month
+
+    Cash vs MTN MoMo vs Orange Money split (design doc B.5 — "first-class
+    widget, not buried in a report")."""
+
+    permission_classes = [IsManagerOrOwner]
+
+    def get(self, request):
+        period = resolve_period(request.query_params.get("period"))
+        start, end = period_range(period)
+
+        rows = (
+            _branch_sales(request, start, end)
+            .values("payment_method")
+            .annotate(revenue=Sum("total_amount"), transaction_count=Count("id"))
+            .order_by("-revenue")
+        )
+        return Response(PaymentBreakdownSerializer(rows, many=True).data)
+
+
+class SalesChartView(APIView):
+    """GET /api/v1/dashboard/sales-chart/?period=today|week|month
+
+    'today' buckets by hour (the B.5 "Sales by hour" bar chart); 'week'
+    and 'month' bucket by day. Returns plain {label, revenue} points —
+    per design doc B.5 the frontend renders these as CSS bars, no chart
+    library, so there's no need to shape this around a specific charting
+    lib's expected format."""
+
+    permission_classes = [IsManagerOrOwner]
+
+    def get(self, request):
+        period = resolve_period(request.query_params.get("period"))
+        start, end = period_range(period)
+        sales = _branch_sales(request, start, end)
+
+        trunc = TruncHour("created_at") if period == "today" else TruncDay("created_at")
+        rows = (
+            sales.annotate(bucket=trunc)
+            .values("bucket")
+            .annotate(revenue=Sum("total_amount"))
+            .order_by("bucket")
+        )
+
+        label_fmt = "%I%p" if period == "today" else "%d %b"
+        data = [
+            {"label": row["bucket"].strftime(label_fmt).lstrip("0").lower(), "revenue": row["revenue"]}
+            for row in rows
+        ]
+        return Response(SalesChartPointSerializer(data, many=True).data)
+
+
+class StockAlertView(APIView):
+    """GET /api/v1/dashboard/stock-alerts/
+
+    Available to all roles, including cashier — design doc E.5 calls
+    this out explicitly as an exception to the manager+ financial
+    gating every other dashboard endpoint uses. Not paginated, not
+    period-filtered (a live snapshot, not a browsable catalogue — that's
+    what /products/ is for)."""
+
+    permission_classes = [IsCashierOrAbove]
+
+    def get(self, request):
+        products = (
+            Product.objects.filter(branch_id=request.branch_id, is_active=True)
+            .filter(stock_level__lte=F("low_stock_threshold"))
+            .order_by("stock_level")
+        )
+        data = [
+            {
+                "product_id": p.id,
+                "product_name": p.name,
+                "stock_level": p.stock_level,
+                "low_stock_threshold": p.low_stock_threshold,
+                "status": p.stock_status,
+            }
+            for p in products
+        ]
+        return Response(StockAlertSerializer(data, many=True).data)
