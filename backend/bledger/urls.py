@@ -2,9 +2,6 @@
 Root URL configuration.
 
 Each app owns its own urls.py and is mounted here under /api/v1/.
-Business-logic apps (auth_users, inventory, sales, suppliers, dashboard,
-sync) are not scaffolded yet — they'll add their own include() lines as
-they're built, in the order described in Bledger_Design_v0.5.docx Part C.
 """
 from django.apps import apps
 from django.conf import settings

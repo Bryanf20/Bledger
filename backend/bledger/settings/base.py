@@ -46,7 +46,7 @@ THIRD_PARTY_APPS = [
 ]
 
 # Business-logic apps are added one at a time as they're built (see
-# Bledger_Design_v0.5.docx, "Next Steps"). Only `core` exists so far.
+# Bledger_Design_v0.5.docx, "Next Steps").
 LOCAL_APPS = [
     "apps.core",
     "apps.auth_users",
