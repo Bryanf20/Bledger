@@ -1,10 +1,14 @@
+from django.http import HttpResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.core.permissions import ROLE_CASHIER, IsCashierOrAbove, IsManagerOrOwner
+from apps.printing.interface import print_receipt
+from apps.printing.pdf_backend import PrinterDependencyMissing
 
 from .models import HeldSale, Sale
+from .receipt_data import build_receipt_context
 from .serializers import HeldSaleSerializer, SaleSerializer, VoidSaleSerializer
 
 
@@ -38,13 +42,20 @@ class SaleViewSet(BranchScopedQuerysetMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"])
     def receipt(self, request, pk=None):
-        # apps.printing doesn't exist yet (design doc Part C). Stubbed
-        # the same way apps.auth_users.LoadTemplateView was stubbed
-        # before apps.inventory existed — un-stub when printing is built.
-        return Response(
-            {"detail": "Receipt generation is not available until the printing app is built."},
-            status=status.HTTP_503_SERVICE_UNAVAILABLE,
-        )
+        # apps.printing now exists (built this session) — un-stubbed from
+        # the 503 apps.auth_users.LoadTemplateView-style placeholder.
+        # print_receipt() is the abstracted printer interface (design doc
+        # 8.4); this view never touches a backend module directly, so a
+        # future PRINTER_BACKEND="thermal" switch needs no changes here.
+        sale = self.get_object()
+        sale_data = build_receipt_context(sale)
+        try:
+            pdf_bytes = print_receipt(sale_data)
+        except PrinterDependencyMissing as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="{sale.reference}.pdf"'
+        return response
 
 
 class HeldSaleViewSet(BranchScopedQuerysetMixin, viewsets.ModelViewSet):

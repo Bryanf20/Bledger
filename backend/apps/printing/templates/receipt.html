@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Receipt {{ reference }}</title>
+<style>
+  @page { size: 80mm auto; margin: 4mm 3mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'DejaVu Sans Mono', 'Courier New', monospace;
+    font-size: 9pt;
+    width: 74mm;
+    margin: 0;
+    color: #000;
+  }
+  .center { text-align: center; }
+  .biz-name { font-size: 12pt; font-weight: bold; margin: 0 0 2px; }
+  .muted { color: #444; font-size: 8pt; margin: 0 0 4px; }
+  hr { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+  .row { display: flex; justify-content: space-between; gap: 6px; margin: 1px 0; }
+  .row.grand { font-weight: bold; font-size: 10pt; }
+  .footer { font-size: 8pt; color: #444; margin-top: 2px; }
+</style>
+</head>
+<body>
+  <p class="center biz-name">{{ business_name }}</p>
+  {% if branch_name %}<p class="center muted">{{ branch_name }}</p>{% endif %}
+  {% if address or phone %}
+  <p class="center muted">
+    {% if address %}{{ address }}{% endif %}{% if address and phone %} &middot; {% endif %}{% if phone %}Tel: {{ phone }}{% endif %}
+  </p>
+  {% endif %}
+  <hr>
+  <div class="row"><span>Date: {{ date }}</span><span>{{ time }}</span></div>
+  <div class="row"><span>Cashier: {{ cashier_name }}</span><span>Sale #{{ sale_number }}</span></div>
+  <hr>
+  {% for item in line_items %}
+  <div class="row"><span>{{ item.name }} &times;{{ item.quantity }}</span><span>{{ item.line_total }}</span></div>
+  {% endfor %}
+  <hr>
+  <div class="row"><span>Subtotal</span><span>{{ subtotal }}</span></div>
+  <div class="row"><span>Tax ({{ tax_rate }})</span><span>{{ tax_amount }}</span></div>
+  <div class="row grand"><span>Total</span><span>{{ total_amount }}</span></div>
+  <hr>
+  <p class="center">Paid by {{ payment_method }}</p>
+  {% if momo_reference %}<p class="center muted">Ref: {{ momo_reference }}</p>{% endif %}
+  <hr>
+  <p class="center footer">Thank you for shopping with us!{% if receipt_footer %}<br>{{ receipt_footer }}{% endif %}</p>
+  <p class="center footer">REF: {{ reference }}</p>
+</body>
+</html>

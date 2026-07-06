@@ -29,9 +29,14 @@ def test_stock_report_csv(owner_client, low_stock_product):
 
 
 @pytest.mark.django_db
-def test_reports_pdf_stubbed_503(owner_client, product):
+def test_reports_pdf_now_available(owner_client, product):
+    # apps.printing was stubbed 503 until this session; now that it
+    # exists, ?export=pdf succeeds via
+    # apps.printing.pdf_backend.render_html_to_pdf().
     response = owner_client.get("/api/v1/reports/products/?export=pdf")
-    assert response.status_code == 503
+    assert response.status_code == 200
+    assert response["Content-Type"] == "application/pdf"
+    assert response.content.startswith(b"%PDF")
 
 
 @pytest.mark.django_db

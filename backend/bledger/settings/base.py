@@ -52,7 +52,7 @@ LOCAL_APPS = [
     "apps.auth_users",
     "apps.inventory",
     "apps.sales",
-    # "apps.printing",
+    "apps.printing",
     "apps.suppliers",
     "apps.dashboard",
     "apps.sync",
@@ -170,3 +170,6 @@ LOGGING = {
         "apps": {"handlers": ["console"], "level": "DEBUG", "propagate": False},
     },
 }
+
+# Design doc 8.4 — one-line switch, zero call-site changes.
+PRINTER_BACKEND = env("PRINTER_BACKEND", default="pdf")
