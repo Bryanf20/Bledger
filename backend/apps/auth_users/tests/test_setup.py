@@ -71,10 +71,34 @@ def test_setup_with_optional_pin(api_client):
 
 
 @pytest.mark.django_db
-def test_load_template_stubbed_until_inventory_app_exists(api_client):
+def test_load_template_success(api_client):
     setup_response = api_client.post("/api/v1/setup/", SETUP_PAYLOAD)
     api_client.credentials(HTTP_AUTHORIZATION=f"Token {setup_response.data['token']}")
 
-    response = api_client.post("/api/v1/setup/load-template/", {"template": "provision_store"})
-    assert response.status_code == 503
+    response = api_client.post(
+        "/api/v1/setup/load-template/", {"template_key": "provision-store"}
+    )
+    assert response.status_code == 201
+    assert response.data["categories_created"] == 6
+    assert response.data["products_created"] == 12
+
+
+@pytest.mark.django_db
+def test_load_template_requires_template_key(api_client):
+    setup_response = api_client.post("/api/v1/setup/", SETUP_PAYLOAD)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Token {setup_response.data['token']}")
+
+    response = api_client.post("/api/v1/setup/load-template/", {})
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_load_template_rejects_unknown_key(api_client):
+    setup_response = api_client.post("/api/v1/setup/", SETUP_PAYLOAD)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Token {setup_response.data['token']}")
+
+    response = api_client.post(
+        "/api/v1/setup/load-template/", {"template_key": "nonexistent"}
+    )
+    assert response.status_code == 404
     

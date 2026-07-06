@@ -50,5 +50,7 @@ def test_bulk_price_override_is_independent_of_retail_override(manager_client, p
 
 
 def test_removing_bulk_min_qty_while_keeping_bulk_price_is_rejected(manager_client, product):
-    resp = manager_client.patch(f"/api/v1/products/{product.id}/", {"bulk_min_qty": None})
+    resp = manager_client.patch(
+        f"/api/v1/products/{product.id}/", {"bulk_min_qty": None}, format="json"
+    )
     assert resp.status_code == 400
