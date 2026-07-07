@@ -1,24 +1,21 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import * as authApi from "../api/auth";
+import { submitSetup } from "../api/setup";
 import { getStoredToken, setStoredToken, UNAUTHORIZED_EVENT } from "../api/client";
 
 const AuthContext = createContext(null);
 
 // Session lifecycle:
 //   1. On mount, if a token is already in storage, call GET /auth/me/
-//      to validate it and restore `user` -- this is what survives a
-//      page refresh (design doc E.1: "used to restore session on app
-//      load").
+//      to validate it and restore `user`.
 //   2. login()/pinLogin() call the respective endpoint, store the
-//      returned token, and set `user` from the response body directly
-//      (no extra /auth/me/ round trip needed -- both endpoints already
-//      return the full profile).
-//   3. logout() calls POST /auth/logout/ (best-effort -- token is
-//      cleared locally regardless of whether the request succeeds)
-//      and clears state.
-//   4. Any 401 from apiClient (e.g. token revoked server-side, or
-//      expired) clears the session the same way, via the
-//      UNAUTHORIZED_EVENT listener below.
+//      returned token, and set `user` from the response body directly.
+//   3. completeSetup() does the same for POST /setup/ -- it returns
+//      the same { token, user } shape (the backend's shared
+//      _token_response() helper), so it reuses the identical
+//      store-token-then-set-user pattern.
+//   4. logout() calls POST /auth/logout/ (best-effort) and clears state.
+//   5. Any 401 from apiClient clears the session via UNAUTHORIZED_EVENT.
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isRestoring, setIsRestoring] = useState(true);
@@ -36,8 +33,6 @@ export function AuthProvider({ children }) {
         const profile = await authApi.fetchMe();
         if (!cancelled) setUser(profile);
       } catch {
-        // Invalid/expired token -- the response interceptor already
-        // cleared it on the 401; just make sure local state matches.
         if (!cancelled) setUser(null);
       } finally {
         if (!cancelled) setIsRestoring(false);
@@ -72,13 +67,18 @@ export function AuthProvider({ children }) {
     return profile;
   }, []);
 
+  const completeSetup = useCallback(async (payload) => {
+    const { token, user: profile } = await submitSetup(payload);
+    setStoredToken(token);
+    setUser(profile);
+    return profile;
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
     } catch {
-      // Ignore -- we clear local state regardless so the user is never
-      // stuck "logged in" client-side just because the network call
-      // failed.
+      // Ignore -- clear local state regardless.
     } finally {
       setStoredToken(null);
       setUser(null);
@@ -94,9 +94,10 @@ export function AuthProvider({ children }) {
       isRestoring,
       login,
       pinLogin,
+      completeSetup,
       logout,
     }),
-    [user, isRestoring, login, pinLogin, logout],
+    [user, isRestoring, login, pinLogin, completeSetup, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

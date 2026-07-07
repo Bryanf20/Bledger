@@ -76,3 +76,33 @@ def load_template(template_key: str, branch_id: str) -> dict:
         "categories_created": len(categories_by_name),
         "products_created": len(created_products),
     }
+
+def list_templates() -> list[dict]:
+    """
+    Read-only counterpart to load_template() -- returns each
+    ProductTemplate's static fields plus counts/preview names read
+    directly from its fixture file. Never touches the database beyond
+    the initial ProductTemplate query, so it's safe to call from an
+    AllowAny endpoint (design doc E.6 -- the setup wizard's step 2 has
+    to render before any account exists to authenticate as).
+
+    This exists so the frontend never has to hardcode template names,
+    icons, or product counts -- that duplication was flagged as an
+    open item after the setup-wizard frontend session and this closes
+    it.
+    """
+    templates = []
+    for template in ProductTemplate.objects.all().order_by("name"):
+        fixture_path = FIXTURES_DIR / template.fixture_name
+        with open(fixture_path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        templates.append({
+            "key": template.key,
+            "name": template.name,
+            "description": template.description,
+            "icon": template.icon,
+            "category_count": len(data.get("categories", [])),
+            "product_count": len(data.get("products", [])),
+            "preview_products": [p["name"] for p in data.get("products", [])[:9]],
+        })
+    return templates

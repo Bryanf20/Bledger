@@ -2,7 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { useSetupStatus } from "./hooks/useSetupStatus";
 import LoginScreen from "./features/auth/LoginScreen";
-import SetupPlaceholder from "./features/setup/SetupPlaceholder";
+import SetupWizard from "./features/setup/SetupWizard";
 import HomePlaceholder from "./features/HomePlaceholder";
 
 function FullPageLoader() {
@@ -13,18 +13,26 @@ function FullPageLoader() {
   );
 }
 
-// Routing gate order matches the design doc's own priority: setup
-// status gates everything (a fresh install must complete setup before
-// anything else is reachable), then auth status gates the rest.
 function RequireSetupComplete({ children }) {
   const { data, isLoading, isError } = useSetupStatus();
 
   if (isLoading) return <FullPageLoader />;
-  // If the status check itself fails (backend unreachable), fail open
-  // to the login screen rather than trapping the user on a loader --
-  // the login/auth calls will surface the same connectivity error.
   if (isError) return children;
   if (!data?.setup_complete) return <Navigate to="/setup" replace />;
+
+  return children;
+}
+
+// Inverse guard for /setup itself: once a Branch with setup_complete
+// is already true, POST /setup/ returns 409 (see SetupView) -- so
+// there's no point letting anyone land on the wizard for an install
+// that's already set up.
+function RequireSetupIncomplete({ children }) {
+  const { data, isLoading, isError } = useSetupStatus();
+
+  if (isLoading) return <FullPageLoader />;
+  if (isError) return children;
+  if (data?.setup_complete) return <Navigate to="/login" replace />;
 
   return children;
 }
@@ -41,7 +49,14 @@ function RequireAuth({ children }) {
 export default function App() {
   return (
     <Routes>
-      <Route path="/setup" element={<SetupPlaceholder />} />
+      <Route
+        path="/setup"
+        element={
+          <RequireSetupIncomplete>
+            <SetupWizard />
+          </RequireSetupIncomplete>
+        }
+      />
       <Route
         path="/login"
         element={

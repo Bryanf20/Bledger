@@ -1,0 +1,301 @@
+/* Ported from 07_setup_wizard.html's inline <style> block. That mockup
+   only shows step 2 (Products) in detail -- steps 1 (Business) and 3
+   (Account) reuse the same .screen/.wiz-header/.wiz-body shell with
+   plain field/button styles consistent with LoginScreen.css's tokens,
+   since no mockup exists for those two steps specifically. */
+
+.wizard-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-background-secondary);
+  padding: 24px;
+}
+
+.wizard-shell {
+  width: 100%;
+  max-width: 680px;
+}
+
+.screen {
+  border: 1.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+  background: var(--color-background-primary);
+}
+
+.wiz-header {
+  background: var(--color-brand-navy);
+  padding: 20px 28px 0;
+}
+
+.wiz-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wiz-brand-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.wiz-brand-sub {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  margin-left: 8px;
+}
+
+.steps-row {
+  display: flex;
+  padding: 16px 0 0;
+}
+
+.step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 16px;
+}
+
+.step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.step.active .step-num {
+  background: #fff;
+  color: var(--color-brand-navy);
+  border-color: #fff;
+}
+
+.step.done .step-num {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.step-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+}
+
+.wiz-body {
+  padding: 28px;
+}
+
+.step-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.step-sub {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 20px;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.tpl-card {
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  padding: 14px 12px;
+  text-align: left;
+  background: var(--color-background-primary);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.tpl-card.active {
+  border-color: var(--color-brand-green);
+  background: var(--color-background-success);
+}
+
+.tpl-card:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 2px;
+}
+
+.tpl-icon {
+  font-size: 22px;
+  margin-bottom: 6px;
+}
+
+.tpl-name {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tpl-desc {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.tpl-count {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  margin-top: 4px;
+}
+
+.preview-box {
+  background: var(--color-background-secondary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 12px 14px;
+}
+
+.preview-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+
+.preview-pill {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--color-background-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+  color: var(--color-text-secondary);
+  display: inline-block;
+  margin: 0 4px 4px 0;
+}
+
+.skip-template-link {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 4px;
+}
+
+.wiz-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin-bottom: 6px;
+}
+
+.field-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  font-size: 14px;
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+
+.field-input:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 1px;
+}
+
+.field-hint {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin-top: 4px;
+}
+
+.field-error {
+  font-size: 12px;
+  color: var(--color-text-danger);
+  margin-top: 4px;
+}
+
+.error-banner {
+  background: var(--color-background-danger);
+  color: var(--color-text-danger);
+  border-radius: var(--border-radius-md);
+  padding: 8px 12px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.info-banner {
+  background: var(--color-background-warning);
+  color: var(--color-text-warning);
+  border-radius: var(--border-radius-md);
+  padding: 8px 12px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.wiz-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 24px;
+}
+
+.wiz-btn {
+  padding: 10px 20px;
+  border-radius: var(--border-radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 0.5px solid var(--color-border-secondary);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+
+.wiz-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.wiz-btn.primary {
+  background: var(--color-brand-navy);
+  border-color: var(--color-brand-navy);
+  color: #fff;
+  margin-left: auto;
+}
+
+.wiz-btn:focus-visible {
+  outline: 2px solid var(--color-brand-navy);
+  outline-offset: 2px;
+}
+
+.caption {
+  max-width: 680px;
+  margin: 14px auto 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  text-align: center;
+}

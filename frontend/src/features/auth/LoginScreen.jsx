@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { extractErrorMessage } from "../../api/errors";
 import PINKeypad from "./PINKeypad";
+import ThemeToggle from "../../components/ThemeToggle";
 import "./LoginScreen.css";
 
 const ROLES = [
@@ -34,9 +35,6 @@ export default function LoginScreen() {
     if (isAuthenticated) navigate("/", { replace: true });
   }, [isAuthenticated, navigate]);
 
-  // Auto-submit the PIN login the moment 4 digits are entered -- this
-  // is the "fast access" cashier flow the design doc describes; making
-  // the cashier press an extra Sign In button would defeat the point.
   useEffect(() => {
     if (selectedRole !== "cashier" || pin.length !== PIN_LENGTH) return;
     if (!username.trim()) {
@@ -94,8 +92,13 @@ export default function LoginScreen() {
       <div className="wrap">
         <div className="left-panel">
           <div>
-            <div className="brand-name">Bledger</div>
-            <div className="brand-sub">Business Ledger</div>
+            <div className="left-panel-top">
+              <div>
+                <div className="brand-name">Bledger</div>
+                <div className="brand-sub">Business Ledger</div>
+              </div>
+              <ThemeToggle variant="on-brand" />
+            </div>
             <div className="brand-tagline">
               Built for Anglophone Cameroonian businesses. Works online, offline, and
               everywhere in between.

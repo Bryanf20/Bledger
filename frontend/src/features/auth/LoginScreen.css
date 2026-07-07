@@ -18,7 +18,7 @@
   border: 1.5px solid var(--color-border-secondary);
   border-radius: var(--border-radius-lg);
   overflow: hidden;
-  background: #fff;
+  background: var(--color-background-primary);
   min-height: 480px;
 }
 
@@ -28,6 +28,13 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+}
+
+.left-panel-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .brand-name {
@@ -84,7 +91,7 @@
   border: 0.5px solid var(--color-border-secondary);
   border-radius: var(--border-radius-md);
   text-align: center;
-  background: #fff;
+  background: var(--color-background-primary);
   cursor: pointer;
   font: inherit;
   color: var(--color-text-primary);
@@ -131,7 +138,7 @@
   font-weight: 700;
   text-align: center;
   line-height: 44px;
-  background: #fff;
+  background: var(--color-background-primary);
   cursor: pointer;
   color: var(--color-text-primary);
 }
@@ -172,6 +179,7 @@
   border: 0.5px solid var(--color-border-secondary);
   border-radius: var(--border-radius-md);
   font-size: 14px;
+  background: var(--color-background-primary);
   color: var(--color-text-primary);
 }
 

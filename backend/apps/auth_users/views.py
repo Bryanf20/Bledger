@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.permissions import IsOwner
-from apps.inventory.services import TemplateNotFoundError, load_template
+from apps.inventory.services import TemplateNotFoundError, list_templates, load_template
 
 from .models import Branch
 from .serializers import (
@@ -137,6 +137,21 @@ class LoadTemplateView(APIView):
             return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(result, status=status.HTTP_201_CREATED)
+
+
+class ProductTemplateListView(APIView):
+    """
+    GET /api/v1/setup/templates/ -- AllowAny, same reasoning as
+    SetupStatusView: the wizard's step 2 must render before an owner
+    account exists to authenticate as. Read-only counterpart to
+    LoadTemplateView below -- returns every ProductTemplate's static
+    fields plus live counts/preview names computed from its fixture
+    file, not hardcoded anywhere.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response(list_templates())
 
 
 class StaffUserCreateView(APIView):

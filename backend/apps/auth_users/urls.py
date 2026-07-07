@@ -22,6 +22,7 @@ auth_urlpatterns = [
 
 setup_urlpatterns = [
     path("status/", views.SetupStatusView.as_view(), name="setup-status"),
+    path("templates/", views.ProductTemplateListView.as_view(), name="setup-templates"),
     path("load-template/", views.LoadTemplateView.as_view(), name="setup-load-template"),
     path("", views.SetupView.as_view(), name="setup"),
 ]

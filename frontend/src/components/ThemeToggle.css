@@ -1,0 +1,52 @@
+.theme-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-secondary);
+  background: var(--color-background-secondary);
+}
+
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.theme-toggle-btn.active {
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+
+.theme-toggle-btn:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 1px;
+}
+
+/* On-brand variant: sits on the constant navy/green brand panels
+   (login left panel, wizard header) rather than a themed surface, so
+   it uses fixed translucent-white styling instead of the theme
+   tokens -- same reasoning as the brand colors themselves not
+   flipping with light/dark. */
+.theme-toggle.on-brand {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.theme-toggle.on-brand .theme-toggle-btn {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.theme-toggle.on-brand .theme-toggle-btn.active {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-brand-navy);
+}

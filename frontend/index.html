@@ -2,8 +2,23 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bledger</title>
+    <script>
+      // Runs synchronously before first paint, before React mounts and
+      // before ThemeContext exists -- reads the same localStorage key
+      // ThemeContext.jsx uses, so the very first frame already has the
+      // right theme instead of flashing light-then-dark (or vice
+      // versa) on load. System preference is only a one-time default
+      // for a visitor with nothing stored yet, not a persistent mode
+      // -- same rule ThemeContext.jsx's resolveInitialTheme() applies.
+      (function () {
+        var stored = localStorage.getItem("bledger_theme_preference");
+        var isDark =
+          stored === "dark" ||
+          (stored !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = isDark ? "dark" : "light";
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

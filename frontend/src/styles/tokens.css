@@ -5,7 +5,14 @@
  * mockup stylesheet used across all seven Phase 1 screen mockups).
  * Every screen in this app should read colors/radii from these
  * variables rather than hardcoding hex values, so the seven mockups
- * and their React implementations stay visually identical.
+ * and their React implementations stay visually identical in light
+ * mode, and so dark mode (added this session) only has to override
+ * values here rather than touch every component's CSS.
+ *
+ * Theme resolution lives in src/context/ThemeContext.jsx, not here:
+ * it decides "system" vs "light" vs "dark" and sets
+ * documentElement.dataset.theme accordingly. This file only reacts to
+ * that attribute -- it has no opinion on *how* the theme was chosen.
  */
 :root {
   --color-background-primary: #ffffff;
@@ -36,9 +43,48 @@
 
   /* Brand colors used on the login screen's brand panel and active
      states (from 06_login.html) -- not in the original token set but
-     used consistently across mockups, so promoted to a variable here. */
+     used consistently across mockups, so promoted to a variable here.
+     Deliberately NOT overridden per-theme below: the navy/green brand
+     panels (login left panel, wizard header, primary buttons) are
+     treated as constant brand identity, not a "surface" that should
+     shift with light/dark. Only the neutral surface/text/border
+     tokens above flip. */
   --color-brand-navy: #1b4f72;
   --color-brand-green: #1d9e75;
+}
+
+/*
+ * Dark overrides. Applied via [data-theme="dark"] on <html>, set by
+ * ThemeContext -- covers both "system prefers dark" and "user manually
+ * chose dark", since ThemeContext resolves both cases down to the same
+ * attribute. No @media (prefers-color-scheme) block here on purpose:
+ * putting system-preference detection in CSS *and* JS would give two
+ * sources of truth that could disagree (e.g. right after a manual
+ * override). JS is the single place that decides the resolved theme.
+ */
+:root[data-theme="dark"] {
+  /* --color-background-primary: #14181c; */
+  --color-background-primary: #262624;
+  /* --color-background-secondary: #1b2026; */
+  --color-background-secondary: black;
+  --color-background-tertiary: #252b32;
+  --color-background-success: #10352c;
+  --color-background-warning: #3a2a0f;
+  --color-background-danger: #3a1a1a;
+  --color-background-info: #102944;
+
+  --color-text-primary: #f1f3f5;
+  --color-text-secondary: #a9b4bf;
+  --color-text-tertiary: #7c8894;
+  --color-text-success: #5ed9a8;
+  --color-text-warning: #f0b74c;
+  --color-text-danger: #f19a94;
+  --color-text-info: #7cbcf0;
+
+  --color-border-primary: #f1f3f5;
+  --color-border-secondary: #3a424b;
+  --color-border-tertiary: #2a3138;
+  --color-border-danger: #6e3535;
 }
 
 body {
@@ -51,6 +97,9 @@ body {
     sans-serif;
   margin: 0;
   padding: 0;
-  background: #fff;
+  background: var(--color-background-primary);
   color: var(--color-text-primary);
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
 }
