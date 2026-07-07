@@ -1,0 +1,230 @@
+/* Ported from 06_login.html's inline <style> block, verbatim where
+   possible, so the React screen matches the reviewed mockup exactly. */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-background-secondary);
+  padding: 24px;
+}
+
+.wrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  max-width: 780px;
+  width: 100%;
+  border: 1.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+  background: #fff;
+  min-height: 480px;
+}
+
+.left-panel {
+  background: var(--color-brand-navy);
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.brand-name {
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.brand-sub {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.brand-tagline {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.6;
+  margin-top: 20px;
+}
+
+.feature {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 8px;
+}
+
+.right-panel {
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.login-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.login-sub {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 24px;
+}
+
+.role-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.role-card {
+  flex: 1;
+  padding: 10px 8px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  text-align: center;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  color: var(--color-text-primary);
+}
+
+.role-card.active {
+  border-color: var(--color-brand-green);
+  background: var(--color-background-success);
+  color: var(--color-text-success);
+}
+
+.pin-display {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.pin-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-border-secondary);
+}
+
+.pin-dot.filled {
+  background: var(--color-brand-navy);
+  border-color: var(--color-brand-navy);
+}
+
+.pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 200px;
+  margin: 0 auto;
+}
+
+.key {
+  height: 46px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 44px;
+  background: #fff;
+  cursor: pointer;
+  color: var(--color-text-primary);
+}
+
+.key:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.key:focus-visible,
+.role-card:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 2px;
+}
+
+.pin-hint {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  text-align: center;
+  margin-top: 8px;
+}
+
+.username-field {
+  margin-bottom: 16px;
+}
+
+.field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin-bottom: 6px;
+}
+
+.field-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  font-size: 14px;
+  color: var(--color-text-primary);
+}
+
+.field-input:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 1px;
+}
+
+.password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.submit-button {
+  background: var(--color-brand-navy);
+  color: #fff;
+  border: none;
+  border-radius: var(--border-radius-md);
+  padding: 11px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.submit-button:focus-visible {
+  outline: 2px solid var(--color-brand-navy);
+  outline-offset: 2px;
+}
+
+.error-banner {
+  background: var(--color-background-danger);
+  color: var(--color-text-danger);
+  border-radius: var(--border-radius-md);
+  padding: 8px 12px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 640px) {
+  .wrap {
+    grid-template-columns: 1fr;
+  }
+  .left-panel {
+    padding: 24px;
+  }
+  .brand-tagline,
+  .feature {
+    display: none;
+  }
+}

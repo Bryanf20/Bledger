@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens ported verbatim from _base.css (the project's shared
+ * mockup stylesheet used across all seven Phase 1 screen mockups).
+ * Every screen in this app should read colors/radii from these
+ * variables rather than hardcoding hex values, so the seven mockups
+ * and their React implementations stay visually identical.
+ */
+:root {
+  --color-background-primary: #ffffff;
+  --color-background-secondary: #f7f8f9;
+  --color-background-tertiary: #eef0f2;
+  --color-background-success: #e1f5ee;
+  --color-background-warning: #faeeda;
+  --color-background-danger: #fcebeb;
+  --color-background-info: #e6f1fb;
+
+  --color-text-primary: #1c1c1c;
+  --color-text-secondary: #5d6d7e;
+  --color-text-tertiary: #8a97a3;
+  --color-text-success: #085041;
+  --color-text-warning: #633806;
+  --color-text-danger: #791f1f;
+  --color-text-info: #0c447c;
+
+  --color-border-primary: #1c1c1c;
+  --color-border-secondary: #c9cfd6;
+  --color-border-tertiary: #e5e8eb;
+  --color-border-danger: #e8a6a6;
+
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+
+  --font-mono: "SFMono-Regular", Consolas, monospace;
+
+  /* Brand colors used on the login screen's brand panel and active
+     states (from 06_login.html) -- not in the original token set but
+     used consistently across mockups, so promoted to a variable here. */
+  --color-brand-navy: #1b4f72;
+  --color-brand-green: #1d9e75;
+}
+
+body {
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  color: var(--color-text-primary);
+}
