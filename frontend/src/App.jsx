@@ -4,6 +4,7 @@ import { useSetupStatus } from "./hooks/useSetupStatus";
 import LoginScreen from "./features/auth/LoginScreen";
 import SetupWizard from "./features/setup/SetupWizard";
 import HomePlaceholder from "./features/HomePlaceholder";
+import POSScreen from "./features/pos/POSScreen";
 
 function FullPageLoader() {
   return (
@@ -71,6 +72,16 @@ export default function App() {
           <RequireSetupComplete>
             <RequireAuth>
               <HomePlaceholder />
+            </RequireAuth>
+          </RequireSetupComplete>
+        }
+      />
+      <Route
+        path="/pos"
+        element={
+          <RequireSetupComplete>
+            <RequireAuth>
+              <POSScreen />
             </RequireAuth>
           </RequireSetupComplete>
         }

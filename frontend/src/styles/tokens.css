@@ -63,10 +63,10 @@
  * override). JS is the single place that decides the resolved theme.
  */
 :root[data-theme="dark"] {
-  /* --color-background-primary: #14181c; */
-  --color-background-primary: #262624;
-  /* --color-background-secondary: #1b2026; */
-  --color-background-secondary: black;
+  --color-background-primary: #14181c;
+  /* --color-background-primary: black; */
+  --color-background-secondary: #1b2026;
+  /* --color-background-secondary: black; */
   --color-background-tertiary: #252b32;
   --color-background-success: #10352c;
   --color-background-warning: #3a2a0f;
@@ -102,4 +102,36 @@ body {
   transition:
     background-color 150ms ease,
     color 150ms ease;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+
+/* Global themed scrollbars — Firefox via scrollbar-width/scrollbar-color,
+   Chrome/Edge/Safari via ::-webkit-scrollbar pseudo-elements (no single
+   property covers both engines yet). Keyed off the same tokens as
+   everything else, so it flips with light/dark mode automatically. */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-secondary) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-secondary);
+  border-radius: 20px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-tertiary);
 }
