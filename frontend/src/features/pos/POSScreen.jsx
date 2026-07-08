@@ -1,8 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import ThemeToggle from "../../components/ThemeToggle";
-import UserMenu from "../../components/UserMenu";
+import Banner from "../../components/Banner";
+import InlineConfirm from "../../components/InlineConfirm";
+import ScreenTopbar from "../../components/ScreenTopbar";
 import XAFAmount from "../../components/XAFAmount";
 import { useProducts } from "../../hooks/useProducts";
 import { useCreateSale } from "../../hooks/useCreateSale";
@@ -130,7 +131,7 @@ export default function POSScreen() {
     return (
       <div className="pos-page">
         <div className="pos-screen">
-          <div className="pos-error-banner">Couldn&apos;t load products. Check your connection.</div>
+          <Banner type="error">Couldn&apos;t load products. Check your connection.</Banner>
         </div>
       </div>
     );
@@ -139,27 +140,21 @@ export default function POSScreen() {
   return (
     <div className="pos-page">
       <div className="pos-screen">
-        <div className="pos-topbar">
-          <div className="pos-topbar-left">
-            <span className="pos-topbar-title">Bledger</span>
-            <span className="pos-topbar-badge">Point of sale</span>
-          </div>
-          <div className="pos-topbar-meta">
-            <span>
-              <span className="pos-sync-dot" />
-              Synced
-            </span>
-            <span>{user?.branch?.branch_name}</span>
-            <ThemeToggle />
-            <UserMenu />
-          </div>
-        </div>
+        <ScreenTopbar
+          title="Bledger"
+          badge="Point of sale"
+          meta={
+            <>
+              <span>
+                <span className="screen-sync-dot" />
+                Synced
+              </span>
+              <span>{user?.branch?.branch_name}</span>
+            </>
+          }
+        />
 
-        {banner && (
-          <div className={banner.type === "error" ? "pos-error-banner" : "pos-success-banner"} role="alert">
-            {banner.message}
-          </div>
-        )}
+        {banner && <Banner type={banner.type}>{banner.message}</Banner>}
 
         <div className="pos-body">
           <div className="pos-left-panel">
@@ -284,53 +279,30 @@ export default function POSScreen() {
                 as "this panel is asking you something," not a global
                 interrupt. */}
             {action === "hold" && (
-              <div className="pos-inline-confirm-backdrop">
-                <div className="pos-inline-confirm">
-                  <p className="pos-inline-confirm-title">Hold this sale</p>
-                  <input
-                    type="text"
-                    className="pos-inline-confirm-input"
-                    placeholder="Label (optional)"
-                    value={holdLabel}
-                    onChange={(e) => setHoldLabel(e.target.value)}
-                    autoFocus
-                  />
-                  <div className="pos-inline-confirm-actions">
-                    <button type="button" className="pos-icon-btn" onClick={closeAction}>
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="pos-confirm-btn pos-inline-confirm-btn"
-                      onClick={confirmHoldSale}
-                      disabled={holdSaleMutation.isPending}
-                    >
-                      {holdSaleMutation.isPending ? "Holding…" : "Hold sale"}
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <InlineConfirm
+                title="Hold this sale"
+                input={{
+                  value: holdLabel,
+                  onChange: (e) => setHoldLabel(e.target.value),
+                  placeholder: "Label (optional)",
+                }}
+                onCancel={closeAction}
+                onConfirm={confirmHoldSale}
+                confirmLabel="Hold sale"
+                confirmPendingLabel="Holding…"
+                isPending={holdSaleMutation.isPending}
+              />
             )}
 
             {action === "clear" && (
-              <div className="pos-inline-confirm-backdrop">
-                <div className="pos-inline-confirm">
-                  <p className="pos-inline-confirm-title">Clear the current sale?</p>
-                  <p className="pos-inline-confirm-sub">This can&apos;t be undone.</p>
-                  <div className="pos-inline-confirm-actions">
-                    <button type="button" className="pos-icon-btn" onClick={closeAction}>
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="pos-inline-confirm-btn pos-inline-confirm-btn-danger"
-                      onClick={confirmClearCart}
-                    >
-                      Clear cart
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <InlineConfirm
+                title="Clear the current sale?"
+                subtitle="This can't be undone."
+                onCancel={closeAction}
+                onConfirm={confirmClearCart}
+                confirmLabel="Clear cart"
+                danger
+              />
             )}
           </div>
         </div>

@@ -1,0 +1,14 @@
+.banner {
+  padding: 8px 12px;
+  border-radius: var(--border-radius-md);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.banner-error {
+  background: var(--color-background-danger);
+  color: var(--color-text-danger);
+}
+.banner-success {
+  background: var(--color-background-success);
+  color: var(--color-text-success);
+}

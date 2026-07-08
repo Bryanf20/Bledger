@@ -19,13 +19,8 @@
    paper is the scroll region now, not the panel around it. */
 
 .receipt-page {
-  height: 100vh;
-  overflow: hidden;
-  display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-background-secondary);
-  /* padding: 20px; */
   box-sizing: border-box;
 }
 
@@ -39,43 +34,18 @@
   gap: 12px;
 }
 
-.receipt-screen {
+/* .receipt-screen {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  /* border: 1.5px solid var(--color-border-secondary);
-  border-radius: var(--border-radius-lg); */
+  border: 1.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-lg);
   overflow: hidden;
   background: var(--color-background-primary);
-}
-
-.receipt-topbar {
-  flex-shrink: 0;
-  background: var(--color-background-secondary);
-  border-bottom: 0.5px solid var(--color-border-tertiary);
-  padding: 10px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.receipt-topbar-title {
-  font-size: 14px;
-  font-weight: 600;
-}
-.receipt-topbar-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
+} */
 
 .receipt-body {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: 1fr 380px;
   overflow: hidden;
 }
 
@@ -84,14 +54,10 @@
    panel itself has overflow: hidden, NOT overflow-y: auto -- it no
    longer scrolls as a whole. Only .receipt-paper below scrolls. */
 .receipt-left {
-  min-height: 0;
   overflow: hidden;
   padding: 24px 28px;
-  display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 20px;
-  border-right: 0.5px solid var(--color-border-tertiary);
 }
 
 /* Fills 100% of the space left over after the status bar -- this is
@@ -262,36 +228,19 @@
    .pos-right-footer) pinned below one scrolling region
    (.receipt-right-scroll, same role as .pos-cart-scroll). */
 .receipt-right {
-  position: relative;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
   padding: 20px 16px;
   gap: 14px;
 }
 .receipt-right-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 .receipt-right-footer {
-  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding-top: 4px;
-}
-
-.receipt-error-banner {
-  background: var(--color-background-danger);
-  color: var(--color-text-danger);
-  border-radius: var(--border-radius-md);
-  padding: 8px 12px;
-  font-size: 12px;
-  flex-shrink: 0;
 }
 
 .receipt-empty-state {
@@ -312,61 +261,6 @@
   font-size: 12px;
   color: var(--color-text-secondary);
   text-align: center;
-}
-
-/* Inline void-confirmation overlay -- same pattern as POSScreen's
-   hold/clear overlay: absolutely positioned within the (relatively
-   positioned) right panel rather than a viewport-wide modal. */
-.receipt-inline-confirm-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: flex-end;
-  z-index: 10;
-}
-.receipt-inline-confirm {
-  width: 100%;
-  background: var(--color-background-primary);
-  border-top: 1px solid var(--color-border-secondary);
-  border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
-  padding: 16px;
-}
-.receipt-inline-confirm-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--color-text-primary);
-  margin: 0 0 4px;
-}
-.receipt-inline-confirm-sub {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  margin: 0 0 12px;
-}
-.receipt-inline-confirm-input {
-  width: 100%;
-  padding: 8px 12px;
-  border: 0.5px solid var(--color-border-secondary);
-  border-radius: var(--border-radius-md);
-  font-size: 13px;
-  background: var(--color-background-primary);
-  color: var(--color-text-primary);
-  margin: 8px 0 12px;
-}
-.receipt-inline-confirm-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.receipt-inline-confirm-btn-danger {
-  padding: 12px;
-  border-radius: var(--border-radius-md);
-  border: none;
-  font-size: 14px;
-  font-weight: 600;
-  background: var(--color-text-danger);
-  color: #fff;
-  cursor: pointer;
 }
 .receipt-inline-confirm-btn-danger:disabled {
   opacity: 0.6;

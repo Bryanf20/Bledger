@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { hasRole } from "../../components/RoleGuard";
-import ThemeToggle from "../../components/ThemeToggle";
-import UserMenu from "../../components/UserMenu";
+import Banner from "../../components/Banner";
+import InlineConfirm from "../../components/InlineConfirm";
+import ScreenTopbar from "../../components/ScreenTopbar";
 import XAFAmount from "../../components/XAFAmount";
 import { useSale, useVoidSale } from "../../hooks/useSale";
 import { fetchReceiptPdf } from "../../api/sales";
@@ -127,18 +128,14 @@ export default function ReceiptScreen() {
           growing the page and silently breaking that overflow-y. */}
       <div className="receipt-shell">
         <div className="receipt-screen">
-          <div className="receipt-topbar">
-            <span className="receipt-topbar-title">
-              Bledger — {isVoided ? "Sale voided" : "Sale complete"}
-            </span>
-            <div className="receipt-topbar-meta">
+          <ScreenTopbar
+            title={`Bledger — ${isVoided ? "Sale voided" : "Sale complete"}`}
+            meta={
               <span>
                 👤 {user?.name} · {user?.branch?.branch_name}
               </span>
-              <ThemeToggle />
-              <UserMenu />
-            </div>
-          </div>
+            }
+          />
 
           <div className="receipt-body">
             <div className="receipt-left">
@@ -316,47 +313,25 @@ export default function ReceiptScreen() {
                 </button>
               </div>
               {showVoidConfirm && (
-                <div className="receipt-inline-confirm-backdrop">
-                  <div className="receipt-inline-confirm">
-                    <p className="receipt-inline-confirm-title">
-                      Void this sale
-                    </p>
-                    <p className="receipt-inline-confirm-sub">
-                      This restores stock for every line item and can&apos;t be
-                      undone.
-                    </p>
-                    <input
-                      type="text"
-                      className="receipt-inline-confirm-input"
-                      placeholder="Reason (required)"
-                      value={voidReason}
-                      onChange={(e) => setVoidReason(e.target.value)}
-                      autoFocus
-                    />
-                    <div className="receipt-inline-confirm-actions">
-                      <button
-                        type="button"
-                        className="receipt-action-btn"
-                        onClick={() => {
-                          setShowVoidConfirm(false);
-                          setVoidReason("");
-                        }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        className="receipt-inline-confirm-btn-danger"
-                        onClick={handleConfirmVoid}
-                        disabled={
-                          !voidReason.trim() || voidSaleMutation.isPending
-                        }
-                      >
-                        {voidSaleMutation.isPending ? "Voiding…" : "Void sale"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <InlineConfirm
+                  title="Void this sale"
+                  subtitle="This restores stock for every line item and can't be undone."
+                  input={{
+                    value: voidReason,
+                    onChange: (e) => setVoidReason(e.target.value),
+                    placeholder: "Reason (required)",
+                  }}
+                  onCancel={() => {
+                    setShowVoidConfirm(false);
+                    setVoidReason("");
+                  }}
+                  onConfirm={handleConfirmVoid}
+                  confirmLabel="Void sale"
+                  confirmPendingLabel="Voiding…"
+                  isPending={voidSaleMutation.isPending}
+                  confirmDisabled={!voidReason.trim()}
+                  danger
+                />
               )}
             </div>
           </div>
