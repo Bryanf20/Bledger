@@ -1,0 +1,385 @@
+/* Ported from 02_receipt.html. Every class is prefixed .receipt- --
+   the project has no CSS Modules/scoping yet, and LoginScreen.css /
+   SetupWizard.css still use unprefixed .screen / .left-panel /
+   .right-panel / .error-banner, which collide across files. POS
+   fixed itself with a pos- prefix; this does the same.
+
+   LAYOUT RULE CARRIED FORWARD FROM THE POS SESSION (don't undo this):
+   .receipt-page -> .receipt-shell -> .receipt-screen -> .receipt-body
+   -> .receipt-left/.receipt-right is a height: 100vh (NOT min-height)
+   chain all the way down, with min-height: 0 on every flex child and
+   overflow: hidden on .receipt-page. min-height: 100vh anywhere in
+   this chain lets that element grow past the viewport on long
+   content, which silently defeats every nested overflow-y: auto below
+   it. Each panel gets exactly one scrolling region plus a fixed
+   header/footer, same split as .pos-left-header + .pos-prod-scroll
+   and .pos-cart-scroll + .pos-right-footer.
+
+   .receipt-left itself no longer scrolls (see below) -- the receipt
+   paper is the scroll region now, not the panel around it. */
+
+.receipt-page {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-background-secondary);
+  /* padding: 20px; */
+  box-sizing: border-box;
+}
+
+.receipt-shell {
+  width: 100%;
+  /* max-width: 900px; */
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.receipt-screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* border: 1.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-lg); */
+  overflow: hidden;
+  background: var(--color-background-primary);
+}
+
+.receipt-topbar {
+  flex-shrink: 0;
+  background: var(--color-background-secondary);
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.receipt-topbar-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+.receipt-topbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.receipt-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  overflow: hidden;
+}
+
+/* Left panel: fixed status bar up top (flex-shrink: 0) + the paper
+   wrap filling every remaining pixel (flex: 1; min-height: 0). The
+   panel itself has overflow: hidden, NOT overflow-y: auto -- it no
+   longer scrolls as a whole. Only .receipt-paper below scrolls. */
+.receipt-left {
+  min-height: 0;
+  overflow: hidden;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  border-right: 0.5px solid var(--color-border-tertiary);
+}
+
+/* Fills 100% of the space left over after the status bar -- this is
+   the "wrap covers 100%" part. It never scrolls itself
+   (overflow: hidden): it's just the gray backdrop card, sized to the
+   panel, centering whatever-height paper sits inside it. */
+.receipt-paper-wrap {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  /* background: var(--color-background-secondary); */
+  border-radius: var(--border-radius-lg);
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* The paper itself is sized to its content (no height set) up to the
+   wrap's available height (max-height: 100%). Short receipts just sit
+   centered in the wrap at their natural size; once line items push
+   the paper past the wrap's height, the paper hits that cap and
+   scrolls internally -- overflow-y: auto lives here, not on the wrap
+   or the panel. Fixed light surface on purpose (see the module-level
+   comment in ReceiptScreen.jsx): this mimics real thermal paper,
+   which doesn't turn dark just because the app shell is in dark
+   mode. */
+.receipt-paper {
+  width: 340px;
+  max-width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  background: #ffffff;
+  color: #1c1c1c;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: 4px;
+  padding: 16px 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  /* Thermal paper keeps its own scrollbar visually consistent with
+     itself regardless of app theme, rather than picking up the
+     global dark-mode thumb color against a white background. */
+  scrollbar-color: #c9cfd6 transparent;
+}
+.receipt-r-center {
+  text-align: center;
+}
+.receipt-r-muted {
+  color: #5d6d7e;
+}
+.receipt-r-biz {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0 0 2px;
+}
+.receipt-r-divider {
+  border: none;
+  border-top: 1px dashed #c9cfd6;
+  margin: 8px 0;
+}
+.receipt-r-item {
+  display: flex;
+  justify-content: space-between;
+  margin: 3px 0;
+}
+.receipt-r-total {
+  display: flex;
+  justify-content: space-between;
+  margin: 2px 0;
+}
+.receipt-r-grand {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.receipt-summary-card {
+  background: var(--color-background-secondary);
+  border-radius: var(--border-radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.receipt-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--color-text-primary);
+}
+
+.receipt-action-btn {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.receipt-action-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.receipt-action-btn.primary {
+  background: var(--color-brand-green);
+  border-color: var(--color-brand-green);
+  color: #fff;
+  text-align: center;
+}
+.receipt-badge {
+  float: right;
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.receipt-status-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-radius: var(--border-radius-md);
+  width: 100%;
+  max-width: 340px;
+  background: var(--color-background-success);
+}
+.receipt-status-bar.voided {
+  background: var(--color-background-danger);
+}
+.receipt-status-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #fff;
+  background: var(--color-brand-green);
+}
+.receipt-status-bar.voided .receipt-status-icon {
+  background: var(--color-text-danger);
+}
+.receipt-status-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-success);
+}
+.receipt-status-bar.voided .receipt-status-title {
+  color: var(--color-text-danger);
+}
+.receipt-status-sub {
+  font-size: 12px;
+  color: var(--color-text-success);
+}
+.receipt-status-bar.voided .receipt-status-sub {
+  color: var(--color-text-danger);
+}
+
+/* Right panel: fixed footer (void / new-sale actions, same role as
+   .pos-right-footer) pinned below one scrolling region
+   (.receipt-right-scroll, same role as .pos-cart-scroll). */
+.receipt-right {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 16px;
+  gap: 14px;
+}
+.receipt-right-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.receipt-right-footer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.receipt-error-banner {
+  background: var(--color-background-danger);
+  color: var(--color-text-danger);
+  border-radius: var(--border-radius-md);
+  padding: 8px 12px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.receipt-empty-state {
+  padding: 32px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: auto;
+}
+
+.receipt-caption {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+/* Inline void-confirmation overlay -- same pattern as POSScreen's
+   hold/clear overlay: absolutely positioned within the (relatively
+   positioned) right panel rather than a viewport-wide modal. */
+.receipt-inline-confirm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  z-index: 10;
+}
+.receipt-inline-confirm {
+  width: 100%;
+  background: var(--color-background-primary);
+  border-top: 1px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+  padding: 16px;
+}
+.receipt-inline-confirm-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0 0 4px;
+}
+.receipt-inline-confirm-sub {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 0 0 12px;
+}
+.receipt-inline-confirm-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  font-size: 13px;
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  margin: 8px 0 12px;
+}
+.receipt-inline-confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.receipt-inline-confirm-btn-danger {
+  padding: 12px;
+  border-radius: var(--border-radius-md);
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--color-text-danger);
+  color: #fff;
+  cursor: pointer;
+}
+.receipt-inline-confirm-btn-danger:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (max-width: 640px) {
+  .receipt-body {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+  .receipt-left {
+    border-right: none;
+    border-bottom: 0.5px solid var(--color-border-tertiary);
+  }
+}

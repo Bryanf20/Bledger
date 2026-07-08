@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import ThemeToggle from "../../components/ThemeToggle";
@@ -14,6 +15,7 @@ import HeldSalesDrawer from "./HeldSalesDrawer";
 import "./POSScreen.css";
 
 export default function POSScreen() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { data: products, isLoading, isError } = useProducts();
   const { data: heldSales } = useHeldSales();
@@ -84,7 +86,7 @@ export default function POSScreen() {
       });
       clear();
       resetPaymentState();
-      setBanner({ type: "success", message: `Sale ${sale.reference} completed.` });
+      navigate(`/receipt/${sale.id}`);
     } catch (err) {
       const detail =
         err.response?.data?.items?.[0] ||

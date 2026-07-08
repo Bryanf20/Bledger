@@ -5,6 +5,7 @@ import LoginScreen from "./features/auth/LoginScreen";
 import SetupWizard from "./features/setup/SetupWizard";
 import HomePlaceholder from "./features/HomePlaceholder";
 import POSScreen from "./features/pos/POSScreen";
+import ReceiptScreen from "./features/receipt/ReceiptScreen";
 
 function FullPageLoader() {
   return (
@@ -82,6 +83,16 @@ export default function App() {
           <RequireSetupComplete>
             <RequireAuth>
               <POSScreen />
+            </RequireAuth>
+          </RequireSetupComplete>
+        }
+      />
+      <Route
+        path="/receipt/:id"
+        element={
+          <RequireSetupComplete>
+            <RequireAuth>
+              <ReceiptScreen />
             </RequireAuth>
           </RequireSetupComplete>
         }
