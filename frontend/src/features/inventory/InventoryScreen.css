@@ -1,0 +1,608 @@
+/* ==========================================================================
+   Inventory screen
+   ==========================================================================
+   Belt-and-braces duplicate of the .inv-page/.inv-screen rules from
+   styles/screen-layout.css -- kept here too so this screen has a real
+   height:100vh chain even if that shared patch isn't applied. Without
+   this, .inv-page/.inv-screen have no height constraint, the whole
+   screen just shrinks to fit its content, and .inv-status-bar sits
+   right under a short list instead of pinned to the bottom.
+   ========================================================================== */
+.inv-page {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  background: var(--color-background-secondary);
+  padding: 10px 0 0;
+}
+
+.inv-screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-background-primary);
+}
+
+.inv-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* -------------------------------------------------------------------------
+   Toolbar
+   ------------------------------------------------------------------------- */
+.inv-toolbar {
+  flex-shrink: 0;
+  padding: 14px 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.inv-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+.inv-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+.inv-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.inv-search {
+  flex: 1;
+  min-width: 180px;
+  padding: 8px 12px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  font-size: 13px;
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+.inv-status-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.inv-view-toggle {
+  display: flex;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.inv-view-toggle button {
+  padding: 8px 10px;
+  background: var(--color-background-primary);
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.inv-view-toggle button + button {
+  border-left: 0.5px solid var(--color-border-secondary);
+}
+.inv-view-toggle button.active {
+  background: var(--color-background-success);
+  color: var(--color-text-success);
+}
+.inv-add-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: var(--border-radius-md);
+  border: none;
+  background: var(--color-brand-green);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.inv-cat-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.inv-pill {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 0.5px solid var(--color-border-secondary);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  background: var(--color-background-primary);
+  white-space: nowrap;
+}
+.inv-pill.active {
+  border-color: var(--color-brand-green);
+  background: var(--color-background-success);
+  color: var(--color-text-success);
+}
+.inv-inactive-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------------------------------
+   Summary stat strip
+   ------------------------------------------------------------------------- */
+.inv-stats-strip {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 0.5px solid var(--color-border-tertiary);
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  margin-top: 10px;
+}
+.inv-stat {
+  padding: 10px 16px;
+  border-right: 0.5px solid var(--color-border-tertiary);
+  min-width: 0;
+}
+.inv-stat:last-child {
+  border-right: none;
+}
+.inv-stat-label {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.inv-stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.inv-stat-value.warning {
+  color: var(--color-text-warning);
+}
+.inv-stat-value.danger {
+  color: var(--color-text-danger);
+}
+
+/* -------------------------------------------------------------------------
+   Content area -- the ONLY scrolling region on this screen. Scrolls
+   both axes: vertically for a long product list, horizontally so the
+   table's columns are reachable instead of getting clipped by the
+   ancestors' overflow:hidden on a narrow window.
+   ------------------------------------------------------------------------- */
+.inv-content {
+  flex: 1;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+  padding: 12px 16px 16px;
+  position: relative;
+}
+
+.inv-empty-state {
+  padding: 40px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+.inv-status-bar {
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border-top: 0.5px solid var(--color-border-tertiary);
+  background: var(--color-background-secondary);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+/* -------------------------------------------------------------------------
+   Table view
+   ------------------------------------------------------------------------- */
+.inv-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+}
+.inv-table th {
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  position: sticky;
+  top: 0;
+  background: var(--color-background-primary);
+  white-space: nowrap;
+}
+.inv-table td {
+  padding: 8px 10px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  color: var(--color-text-primary);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.inv-row-inactive td {
+  opacity: 0.55;
+}
+.inv-cell-name {
+    padding: 8px 10px; /* unchanged from .inv-table td, restated because
+    this selector no longer needs to double as the flex container */
+}
+.inv-cell-name-inner {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: normal;
+}
+.inv-muted {
+  color: var(--color-text-tertiary);
+}
+
+.inv-actions-cell {
+  padding: 8px 10px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+/* Opacity lives on this INNER wrapper, never on .inv-actions-cell (the
+   <td> itself) -- opacity:0 on the cell also hides its border-bottom,
+   which makes a non-hovered row's divider line stop dead at the edge
+   of the visible content instead of running the full width of the
+   table. */
+.inv-actions-inner {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.inv-table tbody tr:hover .inv-actions-inner,
+.inv-table tbody tr:focus-within .inv-actions-inner {
+  opacity: 1;
+}
+
+.inv-row-btn {
+  padding: 5px 10px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-secondary);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.inv-row-btn:hover {
+  border-color: var(--color-text-secondary);
+}
+.inv-row-btn.danger {
+  color: var(--color-text-danger);
+  border-color: var(--color-border-danger);
+}
+.inv-row-btn.danger:hover {
+  background: var(--color-background-danger);
+}
+.inv-row-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Stock status -- two variants. .inv-stock-badge (pill, colored
+   background) is used on cards. .inv-stock-text (colored text only,
+   no background) is used in the table. */
+.inv-stock-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.inv-stock-badge.inv-stock-ok {
+  background: var(--color-background-success);
+  color: var(--color-text-success);
+}
+.inv-stock-badge.inv-stock-low {
+  background: var(--color-background-warning);
+  color: var(--color-text-warning);
+}
+.inv-stock-badge.inv-stock-out {
+  background: var(--color-background-danger);
+  color: var(--color-text-danger);
+}
+
+.inv-stock-text {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.inv-stock-text.inv-stock-ok {
+  color: var(--color-text-success);
+}
+.inv-stock-text.inv-stock-low {
+  color: var(--color-text-warning);
+}
+.inv-stock-text.inv-stock-out {
+  color: var(--color-text-danger);
+}
+
+.inv-bulk-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--color-background-info);
+  color: var(--color-text-info);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.inv-inactive-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--color-background-tertiary);
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------------------------------
+   Card view
+   ------------------------------------------------------------------------- */
+.inv-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.inv-card {
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--color-background-primary);
+}
+.inv-card.inactive {
+  opacity: 0.6;
+}
+.inv-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+}
+.inv-card-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.inv-card-cat {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+.inv-card-price {
+  font-size: 12px;
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+.inv-card-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+/* -------------------------------------------------------------------------
+   Drawers (Add/Edit product, Adjust stock) -- "inline side panel, not
+   a modal" per the UI Design Reference, so no dimmed backdrop. The
+   backdrop stays as a transparent full-viewport click-catcher only.
+   ------------------------------------------------------------------------- */
+.inv-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  display: flex;
+  justify-content: flex-end;
+  z-index: 30;
+}
+.inv-drawer {
+  width: 380px;
+  max-width: 100%;
+  height: 100%;
+  background: var(--color-background-primary);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18);
+  border-left: 0.5px solid var(--color-border-secondary);
+}
+.inv-drawer-header {
+  flex-shrink: 0;
+  padding: 14px 16px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.inv-icon-btn {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.inv-form {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.inv-form-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.inv-drawer-footer {
+  flex-shrink: 0;
+  padding: 14px 16px;
+  border-top: 0.5px solid var(--color-border-tertiary);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.inv-field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+.inv-field-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  font-size: 13px;
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+.inv-field-error {
+  font-size: 11px;
+  color: var(--color-text-danger);
+  margin-top: 4px;
+}
+.inv-cat-select-row {
+  display: flex;
+  gap: 6px;
+}
+.inv-cat-select-row select,
+.inv-cat-select-row input {
+  flex: 1;
+}
+.inv-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-primary);
+}
+.inv-bulk-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.inv-info-note {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  background: var(--color-background-secondary);
+  border-radius: var(--border-radius-md);
+  padding: 8px 10px;
+  line-height: 1.5;
+}
+.inv-current-stock {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.inv-type-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.inv-type-btn {
+  padding: 8px 10px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-secondary);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.inv-type-btn.active {
+  border-color: var(--color-brand-green);
+  background: var(--color-background-success);
+  color: var(--color-text-success);
+}
+.inv-confirm-btn {
+  padding: 10px;
+  border-radius: var(--border-radius-md);
+  border: none;
+  background: var(--color-brand-green);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.inv-confirm-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Deactivate/reactivate control block inside the edit panel. */
+.inv-deactivate-block {
+  border-top: 0.5px solid var(--color-border-tertiary);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+.inv-deactivate-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.inv-deactivate-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .inv-card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+}
+.inv-field-textarea {
+  resize: vertical;
+  min-height: 64px;
+  font-family: inherit;
+}
+.inv-field-hint {
+  font-weight: 400;
+  color: var(--color-text-tertiary);
+}
+.inv-card-desc {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

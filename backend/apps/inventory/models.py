@@ -75,6 +75,10 @@ class Category(BaseModel):
 
 class Product(BaseModel):
     name = models.CharField(max_length=150)
+    # TextField, not CharField -- unlike Category.description (a short
+    # UI label, max_length=255), a product description can reasonably
+    # run longer (specs, notes, variant details) with no practical cap.
+    description = models.TextField(blank=True, default="")
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="products")
     unit = models.CharField(max_length=30, default="unit")
 

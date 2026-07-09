@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "../components/ThemeToggle";
 
@@ -14,8 +15,12 @@ export default function HomePlaceholder() {
         Role: {user?.role} · {user?.branch?.business_name}
       </p>
       <p style={{ color: "var(--color-text-tertiary)", fontSize: 13 }}>
-        POS / dashboard screens are built in future sessions.
+        Sales history, Suppliers, and Dashboard screens are built in future sessions.
       </p>
+      <div style={{ display: "flex", gap: 16, justifyContent: "center", marginBottom: 16 }}>
+        <Link to="/pos">Go to POS</Link>
+        <Link to="/inventory">Go to Inventory</Link>
+      </div>
       <button
         type="button"
         onClick={() => logout()}

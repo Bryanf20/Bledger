@@ -6,6 +6,7 @@ import SetupWizard from "./features/setup/SetupWizard";
 import HomePlaceholder from "./features/HomePlaceholder";
 import POSScreen from "./features/pos/POSScreen";
 import ReceiptScreen from "./features/receipt/ReceiptScreen";
+import InventoryScreen from "./features/inventory/InventoryScreen";
 
 function FullPageLoader() {
   return (
@@ -93,6 +94,16 @@ export default function App() {
           <RequireSetupComplete>
             <RequireAuth>
               <ReceiptScreen />
+            </RequireAuth>
+          </RequireSetupComplete>
+        }
+      />
+      <Route
+        path="/inventory"
+        element={
+          <RequireSetupComplete>
+            <RequireAuth>
+              <InventoryScreen />
             </RequireAuth>
           </RequireSetupComplete>
         }

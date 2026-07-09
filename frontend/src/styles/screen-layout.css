@@ -19,7 +19,8 @@
 
 /* page: full-viewport flex container, never scrolls itself. */
 .pos-page,
-.receipt-page {
+.receipt-page
+.inv-page {
   height: 100vh;
   overflow: hidden;
   display: flex;
@@ -33,7 +34,8 @@
    element grow past the viewport on long content and silently defeat
    every overflow-y: auto nested below it. */
 .pos-screen,
-.receipt-screen {
+.receipt-screen
+.inv-screen {
   flex: 1;
   min-height: 0;
   display: flex;

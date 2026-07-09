@@ -14,7 +14,7 @@ class CategoryAdmin(admin.ModelAdmin):
 class ProductAdmin(admin.ModelAdmin):
     list_display = ("name", "branch_id", "category", "retail_price", "stock_level", "is_active", "source")
     list_filter = ("branch_id", "category", "is_active", "source")
-    search_fields = ("name",)
+    search_fields = ("name", "description")
 
 
 @admin.register(BranchPriceOverride)
