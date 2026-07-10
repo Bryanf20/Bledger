@@ -30,7 +30,8 @@
 .receipt-page,
 .inv-page,
 .sh-page,
-.sup-page {
+.sup-page,
+.dash-page {
   height: 100vh;
   overflow: hidden;
   display: flex;
@@ -47,7 +48,8 @@
 .receipt-screen,
 .inv-screen,
 .sh-screen,
-.sup-screen {
+.sup-screen,
+.dash-screen {
   flex: 1;
   min-height: 0;
   display: flex;

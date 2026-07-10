@@ -10,6 +10,7 @@ import ReceiptScreen from "./features/receipt/ReceiptScreen";
 import InventoryScreen from "./features/inventory/InventoryScreen";
 import SalesHistoryScreen from "./features/sales/SalesHistoryScreen";
 import SuppliersScreen from "./features/suppliers/SuppliersScreen";
+import DashboardScreen from "./features/dashboard/DashboardScreen";
 
 function FullPageLoader() {
   return (
@@ -124,11 +125,7 @@ export default function App() {
       {/* Manager+ only, per apps/suppliers/views.py's IsManagerOrOwner
           gate on the whole backend app -- RoleGuard redirects a
           cashier straight to /pos rather than letting them land on a
-          screen that would just error on every request. This is the
-          first route in the app to use RoleGuard as a route wrapper
-          (existing screens like Receipt gate individual buttons
-          in-component instead); Dashboard, built next, will need the
-          same treatment. */}
+          screen that would just error on every request. */}
       <Route
         path="/suppliers"
         element={
@@ -137,6 +134,25 @@ export default function App() {
               <RoleGuard minimumRole="manager" redirectTo="/pos">
                 <SuppliersScreen />
               </RoleGuard>
+            </RequireAuth>
+          </RequireSetupComplete>
+        }
+      />
+      {/* NOT wrapped in RoleGuard, unlike /suppliers -- the dashboard
+          backend is a mix of permissions (StockAlertView is
+          IsCashierOrAbove; every other endpoint is IsManagerOrOwner),
+          and the UI Design Reference calls this out explicitly:
+          "Stock alerts are cashier-visible ... the one dashboard
+          widget cashiers can see." DashboardScreen itself is
+          role-aware internally (same "same screen, hide what a role
+          can't use" convention InventoryScreen already established)
+          rather than the route bouncing cashiers away entirely. */}
+      <Route
+        path="/dashboard"
+        element={
+          <RequireSetupComplete>
+            <RequireAuth>
+              <DashboardScreen />
             </RequireAuth>
           </RequireSetupComplete>
         }
