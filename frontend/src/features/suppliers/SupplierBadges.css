@@ -1,0 +1,35 @@
+/* Shared pill badge base + semantic color variants -- identical
+   visual language to features/sales/SaleBadges.css and Inventory's
+   stock badges (UI Design Reference "Status badges" global pattern):
+   small pill, colored background matching the semantic token, bold
+   small text. Kept as its own file (not imported from SaleBadges.css)
+   per the project's per-screen CSS prefixing convention -- sup-badge
+   here, sale-badge there. */
+.sup-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sup-badge-success {
+  background: var(--color-background-success);
+  color: var(--color-text-success);
+}
+.sup-badge-warning {
+  background: var(--color-background-warning);
+  color: var(--color-text-warning);
+}
+.sup-badge-danger {
+  background: var(--color-background-danger);
+  color: var(--color-text-danger);
+}
+.sup-badge-info {
+  background: var(--color-background-info);
+  color: var(--color-text-info);
+}
+.sup-badge-neutral {
+  background: var(--color-background-secondary);
+  color: var(--color-text-secondary);
+}

@@ -1,26 +1,36 @@
 /* Shared structural rules for the "page -> screen -> body -> panel
    (scroll region + fixed header/footer)" layout chain used by
-   POSScreen, ReceiptScreen, and InventoryScreen (and any future
-   screen following the same discipline: Sales/Suppliers/Dashboard).
+   POSScreen, ReceiptScreen, InventoryScreen, SalesHistoryScreen, and
+   now SuppliersScreen (and any future screen following the same
+   discipline: Dashboard).
 
    This groups selectors on each screen's own prefixed class names
-   (pos-*, receipt-*, inv-*) rather than introducing a shared
-   unprefixed class -- an unprefixed shared class is exactly what
-   caused the LoginScreen/SetupWizard .screen/.left-panel/.right-panel
-   collision bug. Each screen's own CSS file keeps only the rules
-   unique to it (padding, gap, extra properties); this file holds
-   only the properties confirmed identical across screens.
+   (pos-*, receipt-*, inv-*, sh-*, sup-*) rather than introducing a
+   shared unprefixed class -- an unprefixed shared class is exactly
+   what caused the LoginScreen/SetupWizard .screen/.left-panel/
+   .right-panel collision bug. Each screen's own CSS file keeps only
+   the rules unique to it (padding, gap, extra properties); this file
+   holds only the properties confirmed identical across screens.
 
    Import ONCE in main.jsx, ABOVE any feature CSS and BELOW
    tokens.css -- same cascade-order rule as tokens.css itself (ES
    modules execute depth-first; anything imported after App.jsx loses
    the cascade to whatever App.jsx's own dependency tree pulled in
-   first). */
+   first).
+
+   REMINDER (see the Sales History session's postmortem): every
+   selector added to a group below MUST have its own comma. A missing
+   comma silently turns "a,\nb\nc {" into the descendant selector
+   "a, b c {" instead of three separate selectors -- this exact bug
+   dropped .receipt-page from a rule for a full session before being
+   caught. Double-checked below when adding .sup-page/.sup-screen. */
 
 /* page: full-viewport flex container, never scrolls itself. */
 .pos-page,
 .receipt-page,
-.inv-page {
+.inv-page,
+.sh-page,
+.sup-page {
   height: 100vh;
   overflow: hidden;
   display: flex;
@@ -35,7 +45,9 @@
    every overflow-y: auto nested below it. */
 .pos-screen,
 .receipt-screen,
-.inv-screen {
+.inv-screen,
+.sh-screen,
+.sup-screen {
   flex: 1;
   min-height: 0;
   display: flex;

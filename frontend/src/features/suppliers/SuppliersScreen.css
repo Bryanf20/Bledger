@@ -1,0 +1,486 @@
+/* ==========================================================================
+   Suppliers & Purchases screen
+   ==========================================================================
+   Belt-and-braces duplicate of the .sup-page/.sup-screen rules also
+   added to styles/screen-layout.css this session -- kept here too so
+   this screen has a real height:100vh chain even if that shared file
+   isn't applied, same insurance pattern InventoryScreen.css uses
+   (see that file's header comment for why: a past session broke the
+   shared file with a missing comma and this local copy is what kept
+   Inventory working through it).
+   ========================================================================== */
+.sup-page {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  background: var(--color-background-secondary);
+  padding: 10px 0 0;
+}
+
+.sup-screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-background-primary);
+}
+
+.sup-screen > .banner {
+  margin: 8px 14px 0;
+}
+
+/* -------------------------------------------------------------------------
+   Master-detail body -- 260px fixed list panel + flexible detail panel,
+   per the UI Design Reference's Screen 4 layout description and
+   04_suppliers.html's .body{grid-template-columns:260px 1fr}.
+   ------------------------------------------------------------------------- */
+.sup-body {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  flex: 1;
+  min-height: 0;
+}
+
+/* -------------------------------------------------------------------------
+   Left panel -- supplier directory
+   ------------------------------------------------------------------------- */
+.sup-list-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 0.5px solid var(--color-border-tertiary);
+}
+.sup-list-header {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.sup-search {
+  width: 100%;
+  padding: 7px 10px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  font-size: 12px;
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+.sup-list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.sup-list-empty {
+  padding: 16px 14px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+.sup-item {
+  padding: 12px 14px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  cursor: pointer;
+}
+.sup-item:hover {
+  background: var(--color-background-secondary);
+}
+.sup-item.active {
+  background: var(--color-background-success);
+  border-right: 2px solid var(--color-brand-green);
+}
+.sup-item-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.sup-item-meta {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+.sup-item-total {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+.sup-list-footer {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-top: 0.5px solid var(--color-border-tertiary);
+}
+.sup-add-supplier-btn {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px dashed var(--color-border-secondary);
+  background: var(--color-background-primary);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sup-add-supplier-btn:hover {
+  border-color: var(--color-brand-green);
+  color: var(--color-text-success);
+}
+
+/* -------------------------------------------------------------------------
+   Right panel -- selected supplier detail
+   ------------------------------------------------------------------------- */
+.sup-detail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.sup-empty-state {
+  margin: auto;
+  padding: 40px 20px;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+.sup-detail-header {
+  flex-shrink: 0;
+  padding: 16px 20px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sup-detail-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.sup-detail-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.sup-detail-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.sup-hdr-btn {
+  padding: 7px 12px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-brand-green);
+  background: var(--color-brand-green);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sup-row-btn {
+  padding: 7px 12px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-secondary);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sup-row-btn:hover {
+  border-color: var(--color-text-secondary);
+}
+.sup-row-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sup-stats-strip {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.sup-stat {
+  padding: 10px 16px;
+  border-right: 0.5px solid var(--color-border-tertiary);
+  min-width: 0;
+}
+.sup-stat:last-child {
+  border-right: none;
+}
+.sup-stat-label {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+.sup-stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.sup-stat-value.warning {
+  color: var(--color-text-warning);
+}
+
+/* The one scrolling region in the detail panel -- history table +
+   the inline record-purchase form both live inside it, per the
+   layout-chain rule (fixed header/footer, exactly one scroll region). */
+.sup-detail-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* -------------------------------------------------------------------------
+   Purchase history table
+   ------------------------------------------------------------------------- */
+.sup-table {
+  width: 100%;
+  border-collapse: separate; /* see InventoryScreen.css's sticky-header note --
+                                 kept consistent even though this table has
+                                 no sticky header today, to avoid the same
+                                 class of Chromium border bug if one is added later. */
+  border-spacing: 0;
+}
+.sup-table th {
+  padding: 7px 12px;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  text-align: left;
+  background: var(--color-background-secondary);
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.sup-table td {
+  padding: 9px 12px;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.sup-cell-items {
+  color: var(--color-text-secondary);
+}
+.sup-cell-total {
+  font-weight: 600;
+}
+
+/* -------------------------------------------------------------------------
+   Record purchase form -- inline, not a modal/drawer, per the UI
+   Design Reference: "appears below the history table when triggered."
+   ------------------------------------------------------------------------- */
+.sup-purchase-form {
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-lg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--color-background-secondary);
+}
+.sup-purchase-form-header {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.sup-line-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sup-line-row {
+  display: grid;
+  grid-template-columns: 2fr 70px 100px 100px 28px;
+  gap: 8px;
+  align-items: center;
+}
+.sup-line-row-labels {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.sup-line-qty,
+.sup-line-cost {
+  min-width: 0;
+}
+.sup-line-total {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.sup-muted {
+  color: var(--color-text-tertiary);
+}
+.sup-icon-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  padding: 0;
+}
+.sup-icon-btn:hover {
+  color: var(--color-text-danger);
+}
+.sup-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sup-add-line-btn {
+  align-self: flex-start;
+  padding: 5px 10px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-secondary);
+  background: var(--color-background-primary);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sup-add-line-btn:hover {
+  border-color: var(--color-text-secondary);
+  color: var(--color-text-primary);
+}
+.sup-purchase-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.sup-purchase-form-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 0.5px solid var(--color-border-tertiary);
+}
+.sup-purchase-form-total {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.sup-purchase-form-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* -------------------------------------------------------------------------
+   Shared field styles (used by both the inline purchase form and the
+   supplier add/edit drawer below)
+   ------------------------------------------------------------------------- */
+.sup-field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+.sup-field-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  font-size: 13px;
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+.sup-field-textarea {
+  resize: vertical;
+  min-height: 64px;
+  font-family: inherit;
+}
+.sup-field-error {
+  font-size: 11px;
+  color: var(--color-text-danger);
+  margin-top: 4px;
+}
+.sup-confirm-btn {
+  padding: 10px;
+  border-radius: var(--border-radius-md);
+  border: none;
+  background: var(--color-brand-green);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sup-confirm-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* -------------------------------------------------------------------------
+   Add/Edit supplier drawer -- "inline side panel, not a modal" per
+   the established Inventory convention (see SupplierFormPanel.jsx's
+   header comment). Transparent backdrop, click-outside-to-close only.
+   ------------------------------------------------------------------------- */
+.sup-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  display: flex;
+  justify-content: flex-end;
+  z-index: 30;
+}
+.sup-drawer {
+  width: 360px;
+  max-width: 100%;
+  height: 100%;
+  background: var(--color-background-primary);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18);
+  border-left: 0.5px solid var(--color-border-secondary);
+}
+.sup-drawer-header {
+  flex-shrink: 0;
+  padding: 14px 16px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.sup-form {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sup-form-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sup-drawer-footer {
+  flex-shrink: 0;
+  padding: 14px 16px;
+  border-top: 0.5px solid var(--color-border-tertiary);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (max-width: 720px) {
+  .sup-body {
+    grid-template-columns: 1fr;
+  }
+  .sup-list-panel {
+    display: none; /* small-viewport behavior isn't specced for this
+                       screen yet -- hiding the list rather than
+                       rendering a broken cramped layout is a
+                       deliberate stopgap, flagged as an open item. */
+  }
+}

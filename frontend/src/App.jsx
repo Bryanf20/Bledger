@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { useSetupStatus } from "./hooks/useSetupStatus";
+import RoleGuard from "./components/RoleGuard";
 import LoginScreen from "./features/auth/LoginScreen";
 import SetupWizard from "./features/setup/SetupWizard";
 import HomePlaceholder from "./features/HomePlaceholder";
@@ -8,6 +9,7 @@ import POSScreen from "./features/pos/POSScreen";
 import ReceiptScreen from "./features/receipt/ReceiptScreen";
 import InventoryScreen from "./features/inventory/InventoryScreen";
 import SalesHistoryScreen from "./features/sales/SalesHistoryScreen";
+import SuppliersScreen from "./features/suppliers/SuppliersScreen";
 
 function FullPageLoader() {
   return (
@@ -115,6 +117,26 @@ export default function App() {
           <RequireSetupComplete>
             <RequireAuth>
               <SalesHistoryScreen />
+            </RequireAuth>
+          </RequireSetupComplete>
+        }
+      />
+      {/* Manager+ only, per apps/suppliers/views.py's IsManagerOrOwner
+          gate on the whole backend app -- RoleGuard redirects a
+          cashier straight to /pos rather than letting them land on a
+          screen that would just error on every request. This is the
+          first route in the app to use RoleGuard as a route wrapper
+          (existing screens like Receipt gate individual buttons
+          in-component instead); Dashboard, built next, will need the
+          same treatment. */}
+      <Route
+        path="/suppliers"
+        element={
+          <RequireSetupComplete>
+            <RequireAuth>
+              <RoleGuard minimumRole="manager" redirectTo="/pos">
+                <SuppliersScreen />
+              </RoleGuard>
             </RequireAuth>
           </RequireSetupComplete>
         }
