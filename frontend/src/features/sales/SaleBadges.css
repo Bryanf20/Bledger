@@ -1,0 +1,32 @@
+/* Shared pill badge base + semantic color variants -- same visual
+   language as Inventory's stock badges (UI Design Reference "Status
+   badges" global pattern): small pill, colored background matching
+   the semantic token, bold small text. */
+.sale-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sale-badge-success {
+  background: var(--color-background-success);
+  color: var(--color-text-success);
+}
+.sale-badge-warning {
+  background: var(--color-background-warning);
+  color: var(--color-text-warning);
+}
+.sale-badge-danger {
+  background: var(--color-background-danger);
+  color: var(--color-text-danger);
+}
+.sale-badge-info {
+  background: var(--color-background-info);
+  color: var(--color-text-info);
+}
+.sale-badge-neutral {
+  background: var(--color-background-secondary);
+  color: var(--color-text-secondary);
+}

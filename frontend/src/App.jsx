@@ -7,6 +7,7 @@ import HomePlaceholder from "./features/HomePlaceholder";
 import POSScreen from "./features/pos/POSScreen";
 import ReceiptScreen from "./features/receipt/ReceiptScreen";
 import InventoryScreen from "./features/inventory/InventoryScreen";
+import SalesHistoryScreen from "./features/sales/SalesHistoryScreen";
 
 function FullPageLoader() {
   return (
@@ -104,6 +105,16 @@ export default function App() {
           <RequireSetupComplete>
             <RequireAuth>
               <InventoryScreen />
+            </RequireAuth>
+          </RequireSetupComplete>
+        }
+      />
+      <Route
+        path="/sales"
+        element={
+          <RequireSetupComplete>
+            <RequireAuth>
+              <SalesHistoryScreen />
             </RequireAuth>
           </RequireSetupComplete>
         }

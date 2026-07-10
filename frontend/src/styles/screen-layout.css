@@ -1,15 +1,15 @@
 /* Shared structural rules for the "page -> screen -> body -> panel
    (scroll region + fixed header/footer)" layout chain used by
-   POSScreen and ReceiptScreen, and any future screen following the
-   same discipline (Inventory/Sales/Suppliers/Dashboard).
+   POSScreen, ReceiptScreen, and InventoryScreen (and any future
+   screen following the same discipline: Sales/Suppliers/Dashboard).
 
    This groups selectors on each screen's own prefixed class names
-   (pos-*, receipt-*) rather than introducing a shared unprefixed
-   class -- an unprefixed shared class is exactly what caused the
-   LoginScreen/SetupWizard .screen/.left-panel/.right-panel collision
-   bug. Each screen's own CSS file keeps only the rules unique to it
-   (padding, gap, extra properties); this file holds only the
-   properties confirmed identical across screens.
+   (pos-*, receipt-*, inv-*) rather than introducing a shared
+   unprefixed class -- an unprefixed shared class is exactly what
+   caused the LoginScreen/SetupWizard .screen/.left-panel/.right-panel
+   collision bug. Each screen's own CSS file keeps only the rules
+   unique to it (padding, gap, extra properties); this file holds
+   only the properties confirmed identical across screens.
 
    Import ONCE in main.jsx, ABOVE any feature CSS and BELOW
    tokens.css -- same cascade-order rule as tokens.css itself (ES
@@ -19,7 +19,7 @@
 
 /* page: full-viewport flex container, never scrolls itself. */
 .pos-page,
-.receipt-page
+.receipt-page,
 .inv-page {
   height: 100vh;
   overflow: hidden;
@@ -34,7 +34,7 @@
    element grow past the viewport on long content and silently defeat
    every overflow-y: auto nested below it. */
 .pos-screen,
-.receipt-screen
+.receipt-screen,
 .inv-screen {
   flex: 1;
   min-height: 0;

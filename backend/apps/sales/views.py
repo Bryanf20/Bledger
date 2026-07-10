@@ -1,4 +1,5 @@
 from django.http import HttpResponse
+from django.utils.dateparse import parse_date
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -30,6 +31,46 @@ class SaleViewSet(BranchScopedQuerysetMixin, viewsets.ModelViewSet):
         qs = super().get_queryset()
         if getattr(self.request.user, "role", None) == ROLE_CASHIER:
             qs = qs.filter(cashier=self.request.user)
+        return self._apply_history_filters(qs)
+
+    def _apply_history_filters(self, qs):
+        """
+        Query-param filtering for GET /sales/ — added for the Sales
+        History screen (new this session, not one of the original
+        7 design-doc screens; see project instructions). No
+        DjangoFilterBackend/SearchFilter is used anywhere in this
+        project (see apps.inventory.ProductViewSet's commented-out
+        variant) — manual parsing here matches that established
+        convention instead of introducing a dependency for one
+        endpoint.
+
+        Every param is optional and silently ignored if absent,
+        malformed, or not a recognised choice — a bad filter value
+        should never 400 or 500 a list endpoint, it should just not
+        filter on that dimension.
+        """
+        params = self.request.query_params
+
+        date_from = parse_date(params.get("date_from") or "")
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+
+        date_to = parse_date(params.get("date_to") or "")
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
+
+        payment_method = params.get("payment_method")
+        if payment_method in dict(Sale.PAYMENT_METHOD_CHOICES):
+            qs = qs.filter(payment_method=payment_method)
+
+        status_param = params.get("status")
+        if status_param in dict(Sale.STATUS_CHOICES):
+            qs = qs.filter(status=status_param)
+
+        search = (params.get("search") or "").strip()
+        if search:
+            qs = qs.filter(reference__icontains=search)
+
         return qs
 
     @action(detail=True, methods=["post"], permission_classes=[IsManagerOrOwner])

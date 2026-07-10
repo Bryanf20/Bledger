@@ -1,0 +1,306 @@
+/* ==========================================================================
+   Sales History screen
+   ==========================================================================
+   New this session -- not one of the 7 documented screens. Uses its
+   own sh-* prefix per the project's per-screen CSS prefixing rule.
+
+   No summary stat strip here, unlike Inventory's 4-column strip --
+   deliberate: a money/count strip scoped to just the current page
+   would be misleading (it wouldn't reflect the full filtered set),
+   and real period-based revenue aggregates belong to the Owner
+   Dashboard screen (built next), not duplicated here. The status bar
+   at the bottom uses `count` from the paginated response instead,
+   which spans the whole filtered set, not just the current page.
+   ========================================================================== */
+.sh-page {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  background: var(--color-background-secondary);
+  padding: 10px 0 0;
+}
+
+.sh-screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-background-primary);
+}
+
+.sh-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* -------------------------------------------------------------------------
+   Toolbar
+   ------------------------------------------------------------------------- */
+.sh-toolbar {
+  flex-shrink: 0;
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.sh-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.sh-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+.sh-search {
+  flex: 1;
+  min-width: 180px;
+  padding: 8px 12px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  font-size: 13px;
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+
+.sh-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sh-pill {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 0.5px solid var(--color-border-secondary);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  background: var(--color-background-primary);
+  white-space: nowrap;
+}
+.sh-pill.active {
+  border-color: var(--color-brand-green);
+  background: var(--color-background-success);
+  color: var(--color-text-success);
+}
+
+.sh-view-toggle {
+  display: flex;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.sh-view-toggle button {
+  padding: 8px 10px;
+  background: var(--color-background-primary);
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.sh-view-toggle button + button {
+  border-left: 0.5px solid var(--color-border-secondary);
+}
+.sh-view-toggle button.active {
+  background: var(--color-background-success);
+  color: var(--color-text-success);
+}
+
+.sh-date-range {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sh-date-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.sh-date-label input {
+  padding: 6px 8px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  font-size: 12px;
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+
+.sh-clear-btn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-secondary);
+  background: var(--color-background-primary);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.sh-clear-btn:hover {
+  border-color: var(--color-text-secondary);
+  color: var(--color-text-primary);
+}
+
+/* -------------------------------------------------------------------------
+   Content area -- the one scrolling region on this screen.
+   ------------------------------------------------------------------------- */
+.sh-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 16px;
+}
+.sh-empty-state {
+  padding: 40px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+/* -------------------------------------------------------------------------
+   Table view
+   ------------------------------------------------------------------------- */
+.sh-table {
+  width: 100%;
+  /* border-collapse:separate, not collapse -- Chromium renders the
+     row under a sticky <th> with a short/misaligned border when
+     combined with border-collapse:collapse (see InventoryScreen.css's
+     identical fix, "Debugged/caught" this session). Every border here
+     is already drawn individually via border-bottom on th/td. */
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.sh-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--color-text-tertiary);
+  background: var(--color-background-secondary);
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  white-space: nowrap;
+}
+.sh-table td {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  white-space: nowrap;
+}
+.sh-row {
+  cursor: pointer;
+}
+.sh-row:hover {
+  background: var(--color-background-secondary);
+}
+.sh-row.voided {
+  opacity: 0.6;
+}
+.sh-cell-ref {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-weight: 600;
+}
+.sh-cell-total {
+  font-weight: 700;
+}
+
+/* -------------------------------------------------------------------------
+   Card view
+   ------------------------------------------------------------------------- */
+.sh-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  padding: 12px 0;
+}
+.sh-card {
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--color-background-primary);
+  cursor: pointer;
+}
+.sh-card:hover {
+  border-color: var(--color-border-secondary);
+}
+.sh-card.voided {
+  opacity: 0.6;
+}
+.sh-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.sh-card-ref {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.sh-card-total {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.sh-card-meta {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+/* -------------------------------------------------------------------------
+   Status bar + pager
+   ------------------------------------------------------------------------- */
+.sh-status-bar {
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border-top: 0.5px solid var(--color-border-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.sh-pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sh-pager button {
+  padding: 5px 10px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-secondary);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.sh-pager button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (max-width: 640px) {
+  .sh-card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}
