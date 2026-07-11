@@ -14,7 +14,7 @@
   overflow: hidden;
   display: flex;
   background: var(--color-background-secondary);
-  padding: 10px 0 0;
+  padding-top: 10px;
 }
 
 .sup-screen {

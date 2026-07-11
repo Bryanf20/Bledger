@@ -36,6 +36,15 @@
   overflow: hidden;
   display: flex;
   background: var(--color-background-secondary);
+  /* Room for NavRail (components/NavRail.jsx), a `position: fixed`
+     64px-wide rail added this session -- NOT part of any one screen's
+     own flex layout (see NavRail.jsx's header comment for why it's
+     fixed rather than a layout-route sibling). This is the ONE shared
+     touchpoint every existing screen needs for the rail to not
+     overlap content; nothing else about any screen's internal
+     structure changes. Keep this number in sync with .nav-rail's
+     `width` in NavRail.css if either changes. */
+  padding-left: 64px;
 }
 
 /* screen: the flex-column shell everything else lives inside.
@@ -102,4 +111,22 @@
 .pos-right-footer,
 .receipt-right-footer {
   flex-shrink: 0;
+}
+
+/* NavRail collapses to a fixed BOTTOM bar under 640px (see NavRail.css's
+   own media query) -- the padding-left added in EDIT 1 needs to flip to
+   padding-bottom at the same breakpoint, or every screen keeps 64px of
+   dead space on the left AND has its content sitting under the bottom
+   bar. Same selector group as EDIT 1, so the same missing-comma risk
+   applies -- double-checked here too. */
+@media (max-width: 640px) {
+  .pos-page,
+  .receipt-page,
+  .inv-page,
+  .sh-page,
+  .sup-page,
+  .dash-page {
+    padding-left: 0;
+    padding-bottom: 56px;
+  }
 }

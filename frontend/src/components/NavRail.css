@@ -1,0 +1,109 @@
+/* Fixed left rail, out of document flow -- see NavRail.jsx's header
+   comment for why this is `position: fixed` rather than a flex
+   sibling in a layout route. Width matches the padding-left added to
+   the shared .xxx-page group in screen-layout.css -- keep these two
+   numbers in sync if either changes. */
+.nav-rail {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 64px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--color-brand-navy);
+  padding: 12px 0;
+}
+
+.nav-rail-brand {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--border-radius-md);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  flex-shrink: 0;
+}
+
+.nav-rail-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  align-items: center;
+}
+
+.nav-rail-item {
+  width: 52px;
+  padding: 8px 2px;
+  border-radius: var(--border-radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.6);
+}
+.nav-rail-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+.nav-rail-item.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+.nav-rail-icon {
+  font-size: 17px;
+  line-height: 1;
+}
+.nav-rail-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* Mobile: collapse to a fixed bottom bar, icons only -- no existing
+   screen has a specced mobile nav pattern to match, so this follows
+   the common "bottom tab bar" convention rather than shrinking the
+   rail in place, which would leave labels illegibly small. Screens'
+   own mobile breakpoints (Inventory/Sales History's 640px card-grid
+   media queries) stay untouched; this only repositions the rail
+   itself and the .xxx-page padding that makes room for it (see the
+   screen-layout.css patch). */
+@media (max-width: 640px) {
+  .nav-rail {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: 56px;
+    flex-direction: row;
+    padding: 0 8px;
+    justify-content: space-around;
+  }
+  .nav-rail-brand {
+    display: none;
+  }
+  .nav-rail-items {
+    flex-direction: row;
+    justify-content: space-around;
+    height: 100%;
+  }
+  .nav-rail-item {
+    flex-direction: column;
+    width: auto;
+    flex: 1;
+    justify-content: center;
+    height: 100%;
+    border-radius: 0;
+  }
+}

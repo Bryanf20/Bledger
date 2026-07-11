@@ -10,6 +10,8 @@ from rest_framework import mixins, viewsets
 from rest_framework.permissions import IsAuthenticated
 
 from apps.core.permissions import IsCashierOrAbove, IsManagerOrOwner
+from apps.sync.models import OutboxEntry
+from apps.sync.utils import write_outbox_entry
 
 from .models import HQ_BRANCH_ID, BranchPriceOverride, Category, Product, StockAdjustment
 from .serializers import (
@@ -82,6 +84,13 @@ class ProductViewSet(BranchScopedQuerysetMixin, viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         instance.is_active = False
         instance.save(update_fields=["is_active", "updated_at", "version"])
+        # branch_id defaults to instance.branch_id inside
+        # write_outbox_entry() -- not request.branch_id, since a
+        # deactivated product's own branch_id is the correct outbox
+        # scope even in the (currently theoretical) case of a manager
+        # deactivating an HQ-catalogue row surfaced through
+        # BranchScopedQuerysetMixin's include_hq_catalogue union.
+        write_outbox_entry(instance=instance, operation=OutboxEntry.UPDATE)
 
 
 class BranchPriceOverrideViewSet(

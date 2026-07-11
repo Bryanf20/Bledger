@@ -9,6 +9,9 @@ stay trustworthy for the audit trail.
 from django.db import transaction
 from rest_framework import serializers
 
+from apps.sync.models import OutboxEntry
+from apps.sync.utils import write_outbox_entry
+ 
 from .models import (
     BranchPriceOverride,
     Category,
@@ -95,17 +98,23 @@ class BranchPriceOverrideSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         request = self.context["request"]
         product = validated_data["product"]
-
-        override, _created = BranchPriceOverride.objects.update_or_create(
-            product=product,
-            branch_id=request.branch_id,
-            defaults={
-                "retail_price_override": validated_data.get("retail_price_override"),
-                "bulk_price_override": validated_data.get("bulk_price_override"),
-                "bulk_min_qty_override": validated_data.get("bulk_min_qty_override"),
-                "set_by": request.user,
-            },
-        )
+ 
+        with transaction.atomic():
+            override, created = BranchPriceOverride.objects.update_or_create(
+                product=product,
+                branch_id=request.branch_id,
+                defaults={
+                    "retail_price_override": validated_data.get("retail_price_override"),
+                    "bulk_price_override": validated_data.get("bulk_price_override"),
+                    "bulk_min_qty_override": validated_data.get("bulk_min_qty_override"),
+                    "set_by": request.user,
+                },
+            )
+            write_outbox_entry(
+                instance=override,
+                operation=OutboxEntry.INSERT if created else OutboxEntry.UPDATE,
+                branch_id=request.branch_id,
+            )
         return override
 
 
@@ -159,7 +168,9 @@ class StockAdjustmentSerializer(serializers.ModelSerializer):
             )
             locked_product.stock_level = stock_after
             locked_product.save(update_fields=["stock_level", "updated_at", "version"])
-
+ 
+            write_outbox_entry(instance=adjustment, operation=OutboxEntry.INSERT, branch_id=request.branch_id)
+ 
         return adjustment
 
 
