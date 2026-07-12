@@ -1,8 +1,20 @@
 /* Ported from 07_setup_wizard.html's inline <style> block. That mockup
    only shows step 2 (Products) in detail -- steps 1 (Business) and 3
-   (Account) reuse the same .screen/.wiz-header/.wiz-body shell with
-   plain field/button styles consistent with LoginScreen.css's tokens,
-   since no mockup exists for those two steps specifically. */
+   (Account) reuse the same shell with plain field/button styles
+   consistent with LoginScreen.css's tokens, since no mockup exists
+   for those two steps specifically.
+
+   PREFIX CLEANUP (this session): wiz- was already used for some
+   classes (wiz-header, wiz-body, wiz-nav, wiz-btn, wiz-brand-name,
+   wiz-brand-sub, wiz-form) but not consistently -- .screen, .step*,
+   .field-*, .error-banner, .info-banner, .caption, .template-grid,
+   .tpl-*, .preview-*, .skip-template-link were all still unprefixed
+   and collided in the global stylesheet with LoginScreen.css's
+   (identically-valued, so silently harmless today) .field-label/
+   .field-input/.error-banner. Every class below is now wiz- prefixed
+   -- see LoginScreen.css's matching cleanup this same session.
+   wizard-page/wizard-shell are left as-is: already distinct enough
+   (no other file uses that word) that reprefixing them added nothing. */
 
 .wizard-page {
   min-height: 100vh;
@@ -18,7 +30,7 @@
   max-width: 680px;
 }
 
-.screen {
+.wiz-screen {
   border: 1.5px solid var(--color-border-secondary);
   border-radius: var(--border-radius-lg);
   overflow: hidden;
@@ -49,12 +61,12 @@
   margin-left: 8px;
 }
 
-.steps-row {
+.wiz-steps-row {
   display: flex;
   padding: 16px 0 0;
 }
 
-.step {
+.wiz-step {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -63,7 +75,7 @@
   padding-bottom: 16px;
 }
 
-.step-num {
+.wiz-step-num {
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -76,18 +88,18 @@
   color: #fff;
 }
 
-.step.active .step-num {
+.wiz-step.active .wiz-step-num {
   background: #fff;
   color: var(--color-brand-navy);
   border-color: #fff;
 }
 
-.step.done .step-num {
+.wiz-step.done .wiz-step-num {
   background: rgba(255, 255, 255, 0.25);
   border-color: rgba(255, 255, 255, 0.6);
 }
 
-.step-label {
+.wiz-step-label {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.85);
   font-weight: 600;
@@ -97,25 +109,25 @@
   padding: 28px;
 }
 
-.step-title {
+.wiz-step-title {
   font-size: 18px;
   font-weight: 700;
 }
 
-.step-sub {
+.wiz-step-sub {
   font-size: 13px;
   color: var(--color-text-secondary);
   margin-bottom: 20px;
 }
 
-.template-grid {
+.wiz-template-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
   margin-bottom: 16px;
 }
 
-.tpl-card {
+.wiz-tpl-card {
   border: 0.5px solid var(--color-border-secondary);
   border-radius: var(--border-radius-md);
   padding: 14px 12px;
@@ -126,52 +138,52 @@
   color: inherit;
 }
 
-.tpl-card.active {
+.wiz-tpl-card.active {
   border-color: var(--color-brand-green);
   background: var(--color-background-success);
 }
 
-.tpl-card:focus-visible {
+.wiz-tpl-card:focus-visible {
   outline: 2px solid var(--color-brand-green);
   outline-offset: 2px;
 }
 
-.tpl-icon {
+.wiz-tpl-icon {
   font-size: 22px;
   margin-bottom: 6px;
 }
 
-.tpl-name {
+.wiz-tpl-name {
   font-size: 13px;
   font-weight: 700;
 }
 
-.tpl-desc {
+.wiz-tpl-desc {
   font-size: 11px;
   color: var(--color-text-secondary);
 }
 
-.tpl-count {
+.wiz-tpl-count {
   font-size: 10px;
   color: var(--color-text-tertiary);
   margin-top: 4px;
 }
 
-.preview-box {
+.wiz-preview-box {
   background: var(--color-background-secondary);
   border: 0.5px solid var(--color-border-tertiary);
   border-radius: var(--border-radius-md);
   padding: 12px 14px;
 }
 
-.preview-title {
+.wiz-preview-title {
   font-size: 11px;
   font-weight: 700;
   color: var(--color-text-secondary);
   margin-bottom: 8px;
 }
 
-.preview-pill {
+.wiz-preview-pill {
   font-size: 11px;
   padding: 3px 10px;
   border-radius: 20px;
@@ -182,7 +194,7 @@
   margin: 0 4px 4px 0;
 }
 
-.skip-template-link {
+.wiz-skip-template-link {
   background: none;
   border: none;
   font-size: 12px;
@@ -199,13 +211,13 @@
   gap: 14px;
 }
 
-.field-row {
+.wiz-field-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
 }
 
-.field-label {
+.wiz-field-label {
   display: block;
   font-size: 12px;
   font-weight: 500;
@@ -213,7 +225,7 @@
   margin-bottom: 6px;
 }
 
-.field-input {
+.wiz-field-input {
   width: 100%;
   padding: 10px 12px;
   border: 0.5px solid var(--color-border-secondary);
@@ -223,24 +235,24 @@
   color: var(--color-text-primary);
 }
 
-.field-input:focus-visible {
+.wiz-field-input:focus-visible {
   outline: 2px solid var(--color-brand-green);
   outline-offset: 1px;
 }
 
-.field-hint {
+.wiz-field-hint {
   font-size: 11px;
   color: var(--color-text-tertiary);
   margin-top: 4px;
 }
 
-.field-error {
+.wiz-field-error {
   font-size: 12px;
   color: var(--color-text-danger);
   margin-top: 4px;
 }
 
-.error-banner {
+.wiz-error-banner {
   background: var(--color-background-danger);
   color: var(--color-text-danger);
   border-radius: var(--border-radius-md);
@@ -249,7 +261,7 @@
   margin-bottom: 16px;
 }
 
-.info-banner {
+.wiz-info-banner {
   background: var(--color-background-warning);
   color: var(--color-text-warning);
   border-radius: var(--border-radius-md);
@@ -292,7 +304,7 @@
   outline-offset: 2px;
 }
 
-.caption {
+.wiz-caption {
   max-width: 680px;
   margin: 14px auto 0;
   font-size: 13px;

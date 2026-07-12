@@ -8,16 +8,35 @@ stock_level via F(), and the whole Purchase + line items + outbox
 write happens atomically. Unlike a Sale, a Purchase *increments* stock
 rather than decrementing it — there's no "insufficient stock" check to
 make.
+
+Any amount_paid supplied at creation time now ALSO creates the first
+PurchasePayment row (added this session, right after the ledger itself
+was introduced) -- without this, a purchase recorded with an upfront
+partial payment would set payment_status="partial" but leave the
+payments list empty, which is exactly the inconsistency
+PurchaseDetailPanel's "Payments" section would otherwise surface.
+amount_paid/payment_status stay the source of truth for reads (same
+denormalized-running-total principle as before), but the ledger is now
+complete from the moment a purchase is first recorded, not just for
+installments added afterward via record-payment.
+
+RecordPurchasePaymentSerializer follows
+apps.sales.serializers.VoidSaleSerializer's pattern instead: a plain
+Serializer (not ModelSerializer) whose save() does the actual work,
+backing a narrow action endpoint (PurchaseViewSet.record_payment())
+rather than a general PATCH. See models.py's module docstring for why
+Purchase needed this instead of reopening it to edits.
 """
 from django.db import transaction
 from django.db.models import F
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.inventory.models import Product
 from apps.sync.models import OutboxEntry
 from apps.sync.utils import write_outbox_entry
 
-from .models import Purchase, PurchaseLineItem, Supplier
+from .models import Purchase, PurchaseLineItem, PurchasePayment, Supplier
 
 
 class SupplierSerializer(serializers.ModelSerializer):
@@ -60,30 +79,51 @@ class PurchaseLineItemSerializer(serializers.ModelSerializer):
 
 class PurchaseLineItemInputSerializer(serializers.Serializer):
     """Write-side shape for one restock line — see PurchaseSerializer.create()."""
-
     product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
     quantity = serializers.IntegerField(min_value=1)
     unit_cost = serializers.IntegerField(min_value=0)
 
 
+class PurchasePaymentSerializer(serializers.ModelSerializer):
+    """
+    Read-only nested representation -- shown in PurchaseSerializer's
+    `payments` list so the frontend can render a payment history per
+    purchase without a separate endpoint. Written only via
+    PurchaseSerializer.create() (the initial amount_paid, if any) and
+    RecordPurchasePaymentSerializer (every installment after that) --
+    never directly.
+    """
+    recorded_by_name = serializers.CharField(source="recorded_by.name", read_only=True, default=None)
+
+    class Meta:
+        model = PurchasePayment
+        fields = ["id", "amount", "payment_date", "recorded_by", "recorded_by_name", "note", "created_at"]
+        read_only_fields = fields
+
+
 class PurchaseSerializer(serializers.ModelSerializer):
     line_items = PurchaseLineItemSerializer(many=True, read_only=True)
     items = PurchaseLineItemInputSerializer(many=True, write_only=True)
+    payments = PurchasePaymentSerializer(many=True, read_only=True)
     supplier_name = serializers.CharField(source="supplier.name", read_only=True)
     recorded_by_name = serializers.CharField(source="recorded_by.name", read_only=True)
+    balance_due = serializers.SerializerMethodField()
 
     class Meta:
         model = Purchase
         fields = [
             "id", "supplier", "supplier_name", "purchase_date",
-            "total_amount", "amount_paid", "payment_status",
-            "recorded_by", "recorded_by_name", "line_items", "items",
+            "total_amount", "amount_paid", "payment_status", "balance_due",
+            "recorded_by", "recorded_by_name", "line_items", "items", "payments",
             "created_at",
         ]
         read_only_fields = [
-            "id", "total_amount", "payment_status", "recorded_by",
-            "recorded_by_name", "line_items", "created_at",
+            "id", "total_amount", "payment_status", "balance_due", "recorded_by",
+            "recorded_by_name", "line_items", "payments", "created_at",
         ]
+
+    def get_balance_due(self, purchase):
+        return purchase.balance_due
 
     def validate(self, attrs):
         if not attrs.get("items"):
@@ -149,8 +189,94 @@ class PurchaseSerializer(serializers.ModelSerializer):
                 payload["product"].stock_level = F("stock_level") + payload["quantity"]
                 payload["product"].save(update_fields=["stock_level"])
 
+            # The amount paid at the moment of recording IS a payment --
+            # give it its own PurchasePayment row so the ledger is
+            # complete from the start, not just for installments added
+            # later via record-payment. payment_date defaults to the
+            # purchase's own date (not "today") since that's when this
+            # money actually changed hands, as far as the record goes.
+            if amount_paid > 0:
+                initial_payment = PurchasePayment.objects.create(
+                    branch_id=branch_id,
+                    purchase=purchase,
+                    amount=amount_paid,
+                    payment_date=validated_data["purchase_date"],
+                    recorded_by=request.user,
+                    note="Paid at time of purchase",
+                )
+                write_outbox_entry(instance=initial_payment, operation=OutboxEntry.INSERT, branch_id=branch_id)
+
             write_outbox_entry(instance=purchase, operation=OutboxEntry.INSERT, branch_id=branch_id)
 
         purchase.refresh_from_db()
         return purchase
+
+
+class RecordPurchasePaymentSerializer(serializers.Serializer):
+    """
+    Write-side shape for POST /purchases/{id}/record-payment/ -- the
+    one purpose-built mutation on an otherwise-immutable Purchase
+    (PurchaseViewSet.http_method_names has no PATCH/DELETE), mirroring
+    Sale's /void/ action rather than opening a general PATCH route.
+    See models.py's module docstring for the full reasoning.
+    """
+    amount = serializers.IntegerField(min_value=1)
+    payment_date = serializers.DateField(required=False)
+    note = serializers.CharField(required=False, allow_blank=True, default="")
+
+    def validate(self, attrs):
+        purchase = self.context["purchase"]
+        if purchase.balance_due <= 0:
+            raise serializers.ValidationError("This purchase is already fully paid.")
+        if attrs["amount"] > purchase.balance_due:
+            raise serializers.ValidationError(
+                f"Amount exceeds the remaining balance ({purchase.balance_due} XAF owed)."
+            )
+        return attrs
+
+    def save(self, **kwargs):
+        request = self.context["request"]
+        amount = self.validated_data["amount"]
+        payment_date = self.validated_data.get("payment_date") or timezone.localdate()
+        note = self.validated_data.get("note", "")
+
+        with transaction.atomic():
+            # Re-fetch and lock under the transaction -- the validate()
+            # check above ran against the `purchase` passed in from the
+            # view, fetched before this transaction started. Same race
+            # guard every other select_for_update() call site in this
+            # project uses (e.g. StockAdjustmentSerializer.create()).
+            locked_purchase = Purchase.objects.select_for_update().get(pk=self.context["purchase"].pk)
+            if amount > locked_purchase.balance_due:
+                raise serializers.ValidationError(
+                    f"Amount exceeds the remaining balance ({locked_purchase.balance_due} XAF owed)."
+                )
+
+            payment = PurchasePayment.objects.create(
+                branch_id=locked_purchase.branch_id,
+                purchase=locked_purchase,
+                amount=amount,
+                payment_date=payment_date,
+                recorded_by=request.user,
+                note=note,
+            )
+
+            locked_purchase.amount_paid = F("amount_paid") + amount
+            locked_purchase.save(update_fields=["amount_paid", "updated_at", "version"])
+            locked_purchase.refresh_from_db()
+
+            if locked_purchase.amount_paid >= locked_purchase.total_amount:
+                new_status = Purchase.PAID
+            elif locked_purchase.amount_paid > 0:
+                new_status = Purchase.PARTIAL
+            else:
+                new_status = Purchase.CREDIT
+            if new_status != locked_purchase.payment_status:
+                locked_purchase.payment_status = new_status
+                locked_purchase.save(update_fields=["payment_status", "updated_at", "version"])
+
+            write_outbox_entry(instance=payment, operation=OutboxEntry.INSERT, branch_id=locked_purchase.branch_id)
+            write_outbox_entry(instance=locked_purchase, operation=OutboxEntry.UPDATE, branch_id=locked_purchase.branch_id)
+
+        return locked_purchase
     

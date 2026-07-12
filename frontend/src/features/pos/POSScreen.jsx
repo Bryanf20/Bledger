@@ -4,11 +4,13 @@ import { useAuth } from "../../context/AuthContext";
 import Banner from "../../components/Banner";
 import InlineConfirm from "../../components/InlineConfirm";
 import ScreenTopbar from "../../components/ScreenTopbar";
+import ToastStack from "../../components/ToastStack";
 import XAFAmount from "../../components/XAFAmount";
 import { useProducts } from "../../hooks/useProducts";
 import { useCreateSale } from "../../hooks/useCreateSale";
 import { useHeldSales, useHoldSale } from "../../hooks/useHeldSales";
 import { useCartStore } from "../../store/cartStore";
+import { useToasts } from "../../hooks/useToasts";
 import ProductGrid from "./ProductGrid";
 import Cart from "./Cart";
 import PaymentPanel from "./PaymentPanel";
@@ -36,7 +38,12 @@ export default function POSScreen() {
   const [paymentMethod, setPaymentMethod] = useState(null);
   const [momoReference, setMomoReference] = useState("");
   const [momoConfirmed, setMomoConfirmed] = useState(false);
-  const [banner, setBanner] = useState(null);
+  // Sale-confirmation failures now go through toasts (transient action
+  // feedback), not a persistent Banner -- see Banner.jsx/ToastStack.jsx's
+  // documented distinction. The isError early-return below (products
+  // failed to load at all) is a genuine persistent/blocking state and
+  // stays on Banner.
+  const { toasts, showToast, dismissToast } = useToasts();
 
   // Inline confirmation card shown over the right panel -- replaces
   // window.prompt()/window.confirm() so hold/clear match the app's
@@ -78,7 +85,6 @@ export default function POSScreen() {
   }
 
   async function handleConfirmSale() {
-    setBanner(null);
     try {
       const sale = await createSaleMutation.mutateAsync({
         payment_method: paymentMethod,
@@ -93,7 +99,7 @@ export default function POSScreen() {
         err.response?.data?.items?.[0] ||
         err.response?.data?.detail ||
         "Could not complete the sale. Check stock and try again.";
-      setBanner({ type: "error", message: detail });
+      showToast("error", detail);
     }
   }
 
@@ -153,8 +159,6 @@ export default function POSScreen() {
             </>
           }
         />
-
-        {banner && <Banner type={banner.type}>{banner.message}</Banner>}
 
         <div className="pos-body">
           <div className="pos-left-panel">
@@ -320,6 +324,8 @@ export default function POSScreen() {
           onClose={() => setShowHeldDrawer(false)}
         />
       )}
+
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

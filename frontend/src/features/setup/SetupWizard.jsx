@@ -65,7 +65,7 @@ export default function SetupWizard() {
   return (
     <div className="wizard-page">
       <div className="wizard-shell">
-        <div className="screen">
+        <div className="wiz-screen">
           <div className="wiz-header">
             <div className="wiz-header-top">
               <div>
@@ -74,14 +74,14 @@ export default function SetupWizard() {
               </div>
               <ThemeToggle variant="on-brand" />
             </div>
-            <div className="steps-row">
+            <div className="wiz-steps-row">
               {STEPS.map((s) => (
                 <div
                   key={s.number}
-                  className={`step${s.number === step ? " active" : ""}${s.number < step ? " done" : ""}`}
+                  className={`wiz-step${s.number === step ? " active" : ""}${s.number < step ? " done" : ""}`}
                 >
-                  <div className="step-num">{s.number < step ? "✓" : s.number}</div>
-                  <div className="step-label">{s.label}</div>
+                  <div className="wiz-step-num">{s.number < step ? "✓" : s.number}</div>
+                  <div className="wiz-step-label">{s.label}</div>
                 </div>
               ))}
             </div>
@@ -90,8 +90,8 @@ export default function SetupWizard() {
           <div className="wiz-body">
             {step === 1 && (
               <>
-                <div className="step-title">Tell us about your business</div>
-                <div className="step-sub">This appears on receipts and reports.</div>
+                <div className="wiz-step-title">Tell us about your business</div>
+                <div className="wiz-step-sub">This appears on receipts and reports.</div>
                 <BusinessStep defaultValues={business ?? {}} onContinue={handleBusinessContinue} />
               </>
             )}
@@ -116,7 +116,7 @@ export default function SetupWizard() {
           </div>
         </div>
 
-        <p className="caption">
+        <p className="wiz-caption">
           Bledger — First-run Setup Wizard, Step {step} of 3. Business details → Product
           template selection → Owner account creation.
         </p>

@@ -13,50 +13,50 @@ export default function AccountStep({ defaultValues, onBack, onFinish, isSubmitt
 
   return (
     <form className="wiz-form" onSubmit={handleSubmit(onFinish)}>
-      <div className="step-title">Create your owner account</div>
-      <div className="step-sub">This is the account you&apos;ll use to sign in and manage the business.</div>
+      <div className="wiz-step-title">Create your owner account</div>
+      <div className="wiz-step-sub">This is the account you&apos;ll use to sign in and manage the business.</div>
 
       {submitError && (
-        <div className="error-banner" role="alert">
+        <div className="wiz-error-banner" role="alert">
           {submitError}
         </div>
       )}
 
       <div>
-        <label className="field-label" htmlFor="owner_name">
+        <label className="wiz-field-label" htmlFor="owner_name">
           Your name
         </label>
         <input
           id="owner_name"
-          className="field-input"
+          className="wiz-field-input"
           disabled={isSubmitting}
           {...register("owner_name", { required: "Your name is required." })}
         />
-        {errors.owner_name && <div className="field-error">{errors.owner_name.message}</div>}
+        {errors.owner_name && <div className="wiz-field-error">{errors.owner_name.message}</div>}
       </div>
 
       <div>
-        <label className="field-label" htmlFor="username">
+        <label className="wiz-field-label" htmlFor="username">
           Username
         </label>
         <input
           id="username"
-          className="field-input"
+          className="wiz-field-input"
           autoComplete="username"
           disabled={isSubmitting}
           {...register("username", { required: "Username is required." })}
         />
-        {errors.username && <div className="field-error">{errors.username.message}</div>}
+        {errors.username && <div className="wiz-field-error">{errors.username.message}</div>}
       </div>
 
       <div>
-        <label className="field-label" htmlFor="password">
+        <label className="wiz-field-label" htmlFor="password">
           Password
         </label>
         <input
           id="password"
           type="password"
-          className="field-input"
+          className="wiz-field-input"
           autoComplete="new-password"
           disabled={isSubmitting}
           {...register("password", {
@@ -64,16 +64,16 @@ export default function AccountStep({ defaultValues, onBack, onFinish, isSubmitt
             minLength: { value: 8, message: "Password must be at least 8 characters." },
           })}
         />
-        {errors.password && <div className="field-error">{errors.password.message}</div>}
+        {errors.password && <div className="wiz-field-error">{errors.password.message}</div>}
       </div>
 
       <div>
-        <label className="field-label" htmlFor="pin">
-          4-digit PIN <span className="field-hint">(optional -- for fast mobile sign-in)</span>
+        <label className="wiz-field-label" htmlFor="pin">
+          4-digit PIN <span className="wiz-field-hint">(optional -- for fast mobile sign-in)</span>
         </label>
         <input
           id="pin"
-          className="field-input"
+          className="wiz-field-input"
           inputMode="numeric"
           maxLength={4}
           disabled={isSubmitting}
@@ -82,7 +82,7 @@ export default function AccountStep({ defaultValues, onBack, onFinish, isSubmitt
               !value || /^\d{4}$/.test(value) || "PIN must be exactly 4 digits.",
           })}
         />
-        {errors.pin && <div className="field-error">{errors.pin.message}</div>}
+        {errors.pin && <div className="wiz-field-error">{errors.pin.message}</div>}
       </div>
 
       <div className="wiz-nav">

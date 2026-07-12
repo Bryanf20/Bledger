@@ -484,3 +484,100 @@
                        deliberate stopgap, flagged as an open item. */
   }
 }
+
+/* -------------------------------------------------------------------------
+   Record payment form (RecordPaymentForm.jsx) -- added alongside the
+   payment ledger this session. Reuses RecordPurchaseForm's field/
+   summary/action classes; only this header bar is new.
+   ------------------------------------------------------------------------- */
+.sup-payment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 14px;
+  background: var(--color-background-secondary);
+}
+.sup-payment-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.sup-payment-form-balance {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-warning);
+}
+
+/* -------------------------------------------------------------------------
+   Purchase history rows are now clickable -- open PurchaseDetailPanel
+   instead of a per-row action button (see PurchaseHistoryTable.jsx's
+   header comment, updated this session).
+   ------------------------------------------------------------------------- */
+.sup-table-row-clickable {
+  cursor: pointer;
+}
+.sup-table-row-clickable:hover {
+  background: var(--color-background-secondary);
+}
+ 
+/* -------------------------------------------------------------------------
+   Purchase detail panel (PurchaseDetailPanel.jsx) -- reuses
+   .sup-drawer-backdrop/.sup-drawer/.sup-drawer-header/.sup-form-scroll
+   wholesale for the shell; only the summary block and section titles
+   below are new.
+   ------------------------------------------------------------------------- */
+.sup-detail-panel-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 4px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  margin-bottom: 4px;
+}
+.sup-detail-panel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.sup-detail-panel-row span:last-child {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+.sup-detail-panel-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+}
+ 
+/* If .sup-badge / .sup-badge-success / .sup-badge-warning aren't
+   already defined elsewhere (RecordPaymentForm's "Will be marked
+   Paid/Partial" preview pill uses them) -- add these too. Check
+   SupplierBadges.css first; PaymentStatusBadge likely already
+   defines equivalent variants there under different class names, in
+   which case these can be skipped. */
+.sup-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sup-badge-success {
+  background: var(--color-background-success);
+  color: var(--color-text-success);
+}
+.sup-badge-warning {
+  background: var(--color-background-warning);
+  color: var(--color-text-warning);
+}

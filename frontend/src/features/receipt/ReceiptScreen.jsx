@@ -5,10 +5,12 @@ import { hasRole } from "../../components/RoleGuard";
 import Banner from "../../components/Banner";
 import InlineConfirm from "../../components/InlineConfirm";
 import ScreenTopbar from "../../components/ScreenTopbar";
+import ToastStack from "../../components/ToastStack";
 import XAFAmount from "../../components/XAFAmount";
 import { useSale, useVoidSale } from "../../hooks/useSale";
 import { fetchReceiptPdf } from "../../api/sales";
 import { downloadBlob } from "../../utils/downloadBlob";
+import { useToasts } from "../../hooks/useToasts";
 import "./ReceiptScreen.css";
 
 const PAYMENT_LABELS = {
@@ -43,19 +45,25 @@ export default function ReceiptScreen() {
 
   const [showVoidConfirm, setShowVoidConfirm] = useState(false);
   const [voidReason, setVoidReason] = useState("");
-  const [downloadError, setDownloadError] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  // PDF-download failures now go through toasts (transient action
+  // feedback) instead of the old local .receipt-error-banner div --
+  // that div was never actually routed through the shared <Banner>
+  // component to begin with (a leftover from before Banner.jsx
+  // unified things). The isError/!sale early-return below is a
+  // genuine persistent/blocking state and is untouched by this change.
+  const { toasts, showToast, dismissToast } = useToasts();
 
   const canVoid = hasRole(role, "manager");
 
   async function handleDownloadPdf() {
-    setDownloadError(null);
     setIsDownloading(true);
     try {
       const blob = await fetchReceiptPdf(id);
       downloadBlob(blob, `receipt-${sale.reference}.pdf`);
     } catch (err) {
-      setDownloadError(
+      showToast(
+        "error",
         err.response?.status === 503
           ? "PDF receipts aren't available on this install yet (missing printer setup)."
           : "Couldn't download the receipt. Please try again.",
@@ -89,16 +97,10 @@ export default function ReceiptScreen() {
       <div className="receipt-page">
         <div className="receipt-shell">
           <div className="receipt-screen">
-            <div className="receipt-empty-state">
-              Couldn&apos;t find that sale.
-              <button
-                type="button"
-                className="receipt-action-btn primary"
-                onClick={() => navigate("/pos")}
-              >
-                Back to POS
-              </button>
-            </div>
+            <div className="receipt-empty-state">Couldn&apos;t find that sale.</div>
+            <button type="button" className="receipt-action-btn primary" onClick={() => navigate("/pos")}>
+              Back to POS
+            </button>
           </div>
         </div>
       </div>
@@ -106,26 +108,19 @@ export default function ReceiptScreen() {
   }
 
   const isVoided = sale.status === "voided";
-  const isMomo =
-    sale.payment_method === "mtn_momo" ||
-    sale.payment_method === "orange_money";
-  const paymentLabel =
-    PAYMENT_LABELS[sale.payment_method] ?? sale.payment_method;
-  const unitsCount = sale.line_items.reduce(
-    (sum, item) => sum + item.quantity,
-    0,
-  );
+  const isMomo = sale.payment_method === "mtn_momo" || sale.payment_method === "orange_money";
+  const paymentLabel = PAYMENT_LABELS[sale.payment_method] ?? sale.payment_method;
+  const unitsCount = sale.line_items.reduce((sum, item) => sum + item.quantity, 0);
   const saleNumber = sale.reference.split("-").pop();
 
   return (
     <div className="receipt-page">
       {/* .receipt-shell is the one place that owns the column layout
           and the height:100%/min-height:0 chain (see ReceiptScreen.css
-          header comment) -- .receipt-page just centers it. Same
-          discipline as .pos-page -> .pos-screen -> .pos-body from the
-          POS session: height, not min-height, all the way down, so a
-          long line-item list scrolls inside .receipt-left instead of
-          growing the page and silently breaking that overflow-y. */}
+          header comment) -- .receipt-page just centers it. Height,
+          not min-height, all the way down, so a long line-item list
+          scrolls inside .receipt-left instead of growing the page and
+          silently breaking that overflow-y. */}
       <div className="receipt-shell">
         <div className="receipt-screen">
           <ScreenTopbar
@@ -143,14 +138,10 @@ export default function ReceiptScreen() {
                 <div className="receipt-status-bar voided">
                   <div className="receipt-status-icon">↩</div>
                   <div>
-                    <div className="receipt-status-title">
-                      This sale was voided
-                    </div>
+                    <div className="receipt-status-title">This sale was voided</div>
                     <div className="receipt-status-sub">
                       {sale.void_reason}
-                      {sale.voided_at
-                        ? ` · ${formatDate(sale.voided_at)} ${formatTime(sale.voided_at)}`
-                        : ""}
+                      {sale.voided_at ? ` · ${formatDate(sale.voided_at)} ${formatTime(sale.voided_at)}` : ""}
                     </div>
                   </div>
                 </div>
@@ -161,9 +152,7 @@ export default function ReceiptScreen() {
                     <div className="receipt-status-title">Sale confirmed</div>
                     <div className="receipt-status-sub">
                       <XAFAmount value={sale.total_amount} /> · {paymentLabel}
-                      {isMomo && sale.momo_reference
-                        ? ` · Ref: ${sale.momo_reference}`
-                        : ""}
+                      {isMomo && sale.momo_reference ? ` · Ref: ${sale.momo_reference}` : ""}
                     </div>
                   </div>
                 </div>
@@ -176,9 +165,7 @@ export default function ReceiptScreen() {
                   mode. */}
               <div className="receipt-paper-wrap">
                 <div className="receipt-paper">
-                  <p className="receipt-r-biz receipt-r-center">
-                    {user?.branch?.business_name}
-                  </p>
+                  <p className="receipt-r-biz receipt-r-center">{user?.branch?.business_name}</p>
                   <p className="receipt-r-center receipt-r-muted">
                     {user?.branch?.address} · Tel: {user?.branch?.phone}
                   </p>
@@ -218,18 +205,13 @@ export default function ReceiptScreen() {
                   <hr className="receipt-r-divider" />
                   <p className="receipt-r-center">Paid by {paymentLabel}</p>
                   {isMomo && sale.momo_reference && (
-                    <p className="receipt-r-center receipt-r-muted">
-                      Ref: {sale.momo_reference}
-                    </p>
+                    <p className="receipt-r-center receipt-r-muted">Ref: {sale.momo_reference}</p>
                   )}
                   <hr className="receipt-r-divider" />
                   <p className="receipt-r-center receipt-r-muted">
-                    {user?.branch?.receipt_footer ||
-                      "Thank you for shopping with us!"}
+                    {user?.branch?.receipt_footer || "Thank you for shopping with us!"}
                   </p>
-                  <p className="receipt-r-center receipt-r-muted">
-                    REF: {sale.reference}
-                  </p>
+                  <p className="receipt-r-center receipt-r-muted">REF: {sale.reference}</p>
                 </div>
               </div>
             </div>
@@ -263,10 +245,6 @@ export default function ReceiptScreen() {
                   </div>
                 </div>
 
-                {downloadError && (
-                  <div className="receipt-error-banner">{downloadError}</div>
-                )}
-
                 <button
                   type="button"
                   className="receipt-action-btn"
@@ -275,40 +253,21 @@ export default function ReceiptScreen() {
                 >
                   ⬇ {isDownloading ? "Preparing…" : "Download PDF receipt"}
                 </button>
-                <button
-                  type="button"
-                  className="receipt-action-btn"
-                  disabled
-                  title="Phase 3"
-                >
-                  🖨 Print receipt{" "}
-                  <span className="receipt-badge">Phase 3</span>
+                <button type="button" className="receipt-action-btn" disabled title="Phase 3">
+                  🖨 Print receipt <span className="receipt-badge">Phase 3</span>
                 </button>
-                <button
-                  type="button"
-                  className="receipt-action-btn"
-                  disabled
-                  title="Coming later"
-                >
+                <button type="button" className="receipt-action-btn" disabled title="Coming later">
                   ↗ Share receipt <span className="receipt-badge">future</span>
                 </button>
               </div>
 
               <div className="receipt-right-footer">
                 {canVoid && !isVoided && (
-                  <button
-                    type="button"
-                    className="receipt-action-btn"
-                    onClick={() => setShowVoidConfirm(true)}
-                  >
+                  <button type="button" className="receipt-action-btn" onClick={() => setShowVoidConfirm(true)}>
                     ↩ Void this sale
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="receipt-action-btn primary"
-                  onClick={() => navigate("/pos")}
-                >
+                <button type="button" className="receipt-action-btn primary" onClick={() => navigate("/pos")}>
                   + New sale
                 </button>
               </div>
@@ -337,9 +296,7 @@ export default function ReceiptScreen() {
           </div>
         </div>
 
-        {/* <p className="receipt-caption">
-          80mm receipt preview — same layout used for the Phase 1 PDF and Phase 3 thermal print.
-        </p> */}
+        <ToastStack toasts={toasts} onDismiss={dismissToast} />
       </div>
     </div>
   );

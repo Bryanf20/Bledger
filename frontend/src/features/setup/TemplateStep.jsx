@@ -5,8 +5,7 @@ import { useTemplates } from "../../hooks/useTemplates";
 // with one active card, and a preview box listing the products that
 // template will load. Templates now come from GET /setup/templates/
 // (live counts/previews read from the real fixture files server-side)
-// rather than a hardcoded client-side list -- closes the open item
-// flagged in the prior session.
+// rather than a hardcoded client-side list.
 export default function TemplateStep({ defaultTemplateKey, onBack, onContinue }) {
   const { data: templates, isLoading, isError } = useTemplates();
 
@@ -31,13 +30,13 @@ export default function TemplateStep({ defaultTemplateKey, onBack, onContinue })
   }
 
   if (isLoading) {
-    return <div className="step-sub">Loading product templates…</div>;
+    return <div className="wiz-step-sub">Loading product templates…</div>;
   }
 
   if (isError || !templates?.length) {
     return (
       <div>
-        <div className="error-banner" role="alert">
+        <div className="wiz-error-banner" role="alert">
           Couldn&apos;t load product templates. You can skip this step and add products
           manually after setup.
         </div>
@@ -55,39 +54,39 @@ export default function TemplateStep({ defaultTemplateKey, onBack, onContinue })
 
   return (
     <div>
-      <div className="step-title">Start with a product template</div>
-      <div className="step-sub">
+      <div className="wiz-step-title">Start with a product template</div>
+      <div className="wiz-step-sub">
         Pick the template closest to your business. You can remove products you don&apos;t
         stock and add your own after setup.
       </div>
 
-      <div className="template-grid">
+      <div className="wiz-template-grid">
         {templates.map((tpl) => (
           <button
             key={tpl.key}
             type="button"
-            className={`tpl-card${!skipped && templateKey === tpl.key ? " active" : ""}`}
+            className={`wiz-tpl-card${!skipped && templateKey === tpl.key ? " active" : ""}`}
             onClick={() => selectTemplate(tpl.key)}
             aria-pressed={!skipped && templateKey === tpl.key}
           >
-            <div className="tpl-icon">{tpl.icon}</div>
-            <div className="tpl-name">{tpl.name}</div>
-            <div className="tpl-desc">{tpl.description}</div>
-            <div className="tpl-count">{tpl.product_count} products pre-loaded</div>
+            <div className="wiz-tpl-icon">{tpl.icon}</div>
+            <div className="wiz-tpl-name">{tpl.name}</div>
+            <div className="wiz-tpl-desc">{tpl.description}</div>
+            <div className="wiz-tpl-count">{tpl.product_count} products pre-loaded</div>
           </button>
         ))}
       </div>
 
       {skipped ? (
-        <div className="info-banner">
+        <div className="wiz-info-banner">
           No template will be loaded. You can add products from Inventory after setup.
         </div>
       ) : (
         selected && (
-          <div className="preview-box">
-            <div className="preview-title">Products that will be loaded ({selected.product_count})</div>
+          <div className="wiz-preview-box">
+            <div className="wiz-preview-title">Products that will be loaded ({selected.product_count})</div>
             {selected.preview_products.map((name) => (
-              <span key={name} className="preview-pill">
+              <span key={name} className="wiz-preview-pill">
                 {name}
               </span>
             ))}
@@ -95,7 +94,7 @@ export default function TemplateStep({ defaultTemplateKey, onBack, onContinue })
         )
       )}
 
-      <button type="button" className="skip-template-link" onClick={() => setSkipped((s) => !s)}>
+      <button type="button" className="wiz-skip-template-link" onClick={() => setSkipped((s) => !s)}>
         {skipped ? "Actually, load a template" : "Skip — I'll add products myself"}
       </button>
 

@@ -4,7 +4,9 @@ const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"];
 
 // Controlled component: `value` is the PIN digits typed so far (string,
 // up to `length` chars), `onChange` receives the next value.
-// Mirrors 06_login.html's .pin-display / .pin-keypad exactly.
+// Mirrors 06_login.html's .pin-display / .pin-keypad exactly (now
+// login-pin-display / login-pin-keypad after this session's CSS
+// prefix cleanup -- see LoginScreen.css's header comment).
 export default function PINKeypad({ value, onChange, length = 4, disabled = false }) {
   function pressKey(key) {
     if (disabled) return;
@@ -19,12 +21,12 @@ export default function PINKeypad({ value, onChange, length = 4, disabled = fals
 
   return (
     <div>
-      <div className="pin-display" role="status" aria-label={`${value.length} of ${length} digits entered`}>
+      <div className="login-pin-display" role="status" aria-label={`${value.length} of ${length} digits entered`}>
         {Array.from({ length }).map((_, i) => (
-          <div key={i} className={`pin-dot${i < value.length ? " filled" : ""}`} />
+          <div key={i} className={`login-pin-dot${i < value.length ? " filled" : ""}`} />
         ))}
       </div>
-      <div className="pin-keypad">
+      <div className="login-pin-keypad">
         {KEYS.map((key, i) =>
           key === "" ? (
             <div key={i} />
@@ -32,7 +34,7 @@ export default function PINKeypad({ value, onChange, length = 4, disabled = fals
             <button
               key={i}
               type="button"
-              className="key"
+              className="login-key"
               onClick={() => pressKey(key)}
               disabled={disabled}
               aria-label={key === "⌫" ? "Backspace" : `Digit ${key}`}
@@ -42,7 +44,7 @@ export default function PINKeypad({ value, onChange, length = 4, disabled = fals
           ),
         )}
       </div>
-      <div className="pin-hint">4-digit PIN · fast access for cashiers</div>
+      <div className="login-pin-hint">4-digit PIN · fast access for cashiers</div>
     </div>
   );
 }

@@ -8,11 +8,16 @@ import apiClient from "./client";
 //     read/write split; cashiers never call any of this.)
 //   GET/POST /purchases/                            (no PATCH/DELETE --
 //     a recorded purchase is a permanent financial record once it's
-//     updated the stock ledger, same principle as Sale.)
+//     updated the stock ledger.)
+//   POST /purchases/{id}/record-payment/            (added this session
+//     -- the one purpose-built mutation on an otherwise-immutable
+//     Purchase, for recording a payment installment against a
+//     partial/credit balance. See PurchaseViewSet.record_payment /
+//     RecordPurchasePaymentSerializer.)
 //
-// Neither endpoint has a SearchFilter/DjangoFilterBackend today (same
-// situation as /products/ and /categories/), and PurchaseViewSet has
-// no ?supplier= query param -- so this mirrors api/inventory.js's
+// Neither list endpoint has a SearchFilter/DjangoFilterBackend today
+// (same situation as /products/ and /categories/), and PurchaseViewSet
+// has no ?supplier= query param -- so this mirrors api/inventory.js's
 // approach: fetch everything with page_size=1000 and filter/group
 // client-side (by search text, and by supplier.id for the selected
 // supplier's purchase history) rather than assuming server-side
@@ -35,7 +40,7 @@ export async function updateSupplier(id, payload) {
 
 export async function fetchPurchases() {
   const { data } = await apiClient.get("/purchases/", { params: { page_size: 1000 } });
-  return data.results; // Purchase[] (each with nested line_items)
+  return data.results; // Purchase[] (each with nested line_items, payments, balance_due)
 }
 
 // payload: { supplier, purchase_date, amount_paid, items: [{ product, quantity, unit_cost }] }
@@ -43,5 +48,16 @@ export async function fetchPurchases() {
 // PurchaseSerializer.create() -- never sent from here.
 export async function createPurchase(payload) {
   const { data } = await apiClient.post("/purchases/", payload);
+  return data; // Purchase
+}
+
+// payload: { amount, payment_date?, note? } -- amount is validated
+// server-side against the purchase's current balance_due (rejects
+// zero/negative and overpayment); payment_date defaults to today if
+// omitted. Returns the updated Purchase, including the new payment in
+// its `payments` list and the recalculated amount_paid/payment_status/
+// balance_due.
+export async function recordPurchasePayment(purchaseId, payload) {
+  const { data } = await apiClient.post(`/purchases/${purchaseId}/record-payment/`, payload);
   return data; // Purchase
 }

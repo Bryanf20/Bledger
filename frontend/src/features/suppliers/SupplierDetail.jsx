@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import XAFAmount from "../../components/XAFAmount";
 import PurchaseHistoryTable from "./PurchaseHistoryTable";
 import RecordPurchaseForm from "./RecordPurchaseForm";
+import PurchaseDetailPanel from "./PurchaseDetailPanel";
 
 function formatDate(isoDate) {
   const d = new Date(`${isoDate}T00:00:00`);
@@ -13,14 +14,25 @@ function formatDate(isoDate) {
 // for the stats strip's first two columns come from the Supplier
 // object itself (server-annotated); only "unpaid/partial count" is
 // computed here client-side, since that's not annotated server-side.
+//
+// `viewingPurchaseId` (added this session) holds an id, not a
+// snapshot of the purchase object -- PurchaseDetailPanel is handed
+// `purchases.find(...)` fresh on every render, so once
+// RecordPaymentForm's mutation invalidates ["purchases"] and it
+// refetches, the open panel picks up the new balance_due/payments
+// automatically instead of showing stale data until it's closed and
+// reopened.
 export default function SupplierDetail({ supplier, purchases, isLoading, onEditSupplier, onSuccess, onError }) {
   const [showForm, setShowForm] = useState(false);
+  const [viewingPurchaseId, setViewingPurchaseId] = useState(null);
 
   const stats = useMemo(() => {
     const unpaidCount = purchases.filter((p) => p.payment_status !== "paid").length;
     const lastPurchase = purchases[0] ?? null;
     return { unpaidCount, lastPurchase };
   }, [purchases]);
+
+  const viewingPurchase = viewingPurchaseId ? purchases.find((p) => p.id === viewingPurchaseId) ?? null : null;
 
   if (isLoading) {
     return (
@@ -73,7 +85,7 @@ export default function SupplierDetail({ supplier, purchases, isLoading, onEditS
       </div>
 
       <div className="sup-detail-scroll">
-        <PurchaseHistoryTable purchases={purchases} />
+        <PurchaseHistoryTable purchases={purchases} onSelectPurchase={(p) => setViewingPurchaseId(p.id)} />
 
         {showForm && (
           <RecordPurchaseForm
@@ -87,6 +99,15 @@ export default function SupplierDetail({ supplier, purchases, isLoading, onEditS
           />
         )}
       </div>
+
+      {viewingPurchase && (
+        <PurchaseDetailPanel
+          purchase={viewingPurchase}
+          onClose={() => setViewingPurchaseId(null)}
+          onSuccess={onSuccess}
+          onError={onError}
+        />
+      )}
     </div>
   );
 }

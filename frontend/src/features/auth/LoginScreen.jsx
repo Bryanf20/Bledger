@@ -89,47 +89,47 @@ export default function LoginScreen() {
 
   return (
     <div className="login-page">
-      <div className="wrap">
-        <div className="left-panel">
+      <div className="login-wrap">
+        <div className="login-left-panel">
           <div>
-            <div className="left-panel-top">
+            <div className="login-left-panel-top">
               <div>
-                <div className="brand-name">Bledger</div>
-                <div className="brand-sub">Business Ledger</div>
+                <div className="login-brand-name">Bledger</div>
+                <div className="login-brand-sub">Business Ledger</div>
               </div>
               <ThemeToggle variant="on-brand" />
             </div>
-            <div className="brand-tagline">
+            <div className="login-brand-tagline">
               Built for Anglophone Cameroonian businesses. Works online, offline, and
               everywhere in between.
             </div>
           </div>
           <div>
-            <div className="feature">• Runs fully offline — no internet needed</div>
-            <div className="feature">• Sales, inventory &amp; supplier tracking</div>
-            <div className="feature">• MTN MoMo &amp; Orange Money support</div>
-            <div className="feature">• PDF receipts in XAF</div>
+            <div className="login-feature">• Runs fully offline — no internet needed</div>
+            <div className="login-feature">• Sales, inventory &amp; supplier tracking</div>
+            <div className="login-feature">• MTN MoMo &amp; Orange Money support</div>
+            <div className="login-feature">• PDF receipts in XAF</div>
           </div>
         </div>
 
-        <div className="right-panel">
+        <div className="login-right-panel">
           <div className="login-title">Welcome back</div>
           <div className="login-sub">Standalone mode</div>
 
           {error && (
-            <div className="error-banner" role="alert">
+            <div className="login-error-banner" role="alert">
               {error}
             </div>
           )}
 
-          <div className="role-selector" role="tablist" aria-label="Login method">
+          <div className="login-role-selector" role="tablist" aria-label="Login method">
             {ROLES.map((r) => (
               <button
                 key={r.key}
                 type="button"
                 role="tab"
                 aria-selected={selectedRole === r.key}
-                className={`role-card${selectedRole === r.key ? " active" : ""}`}
+                className={`login-role-card${selectedRole === r.key ? " active" : ""}`}
                 onClick={() => handleRoleChange(r.key)}
               >
                 {r.icon}
@@ -139,13 +139,13 @@ export default function LoginScreen() {
             ))}
           </div>
 
-          <div className="username-field">
-            <label className="field-label" htmlFor="username">
+          <div className="login-username-field">
+            <label className="login-field-label" htmlFor="username">
               Username
             </label>
             <input
               id="username"
-              className="field-input"
+              className="login-field-input"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
@@ -156,26 +156,26 @@ export default function LoginScreen() {
           {isCashierFlow ? (
             <PINKeypad value={pin} onChange={setPin} length={PIN_LENGTH} disabled={isSubmitting} />
           ) : (
-            <form className="password-form" onSubmit={handleSubmit(onPasswordSubmit)}>
+            <form className="login-password-form" onSubmit={handleSubmit(onPasswordSubmit)}>
               <div>
-                <label className="field-label" htmlFor="password">
+                <label className="login-field-label" htmlFor="password">
                   Password
                 </label>
                 <input
                   id="password"
                   type="password"
-                  className="field-input"
+                  className="login-field-input"
                   autoComplete="current-password"
                   disabled={isSubmitting}
                   {...register("password", { required: "Password is required." })}
                 />
                 {errors.password && (
-                  <div className="error-banner" style={{ marginTop: 8 }}>
+                  <div className="login-error-banner" style={{ marginTop: 8 }}>
                     {errors.password.message}
                   </div>
                 )}
               </div>
-              <button type="submit" className="submit-button" disabled={isSubmitting}>
+              <button type="submit" className="login-submit-button" disabled={isSubmitting}>
                 {isSubmitting ? "Signing in…" : "Sign in"}
               </button>
             </form>
