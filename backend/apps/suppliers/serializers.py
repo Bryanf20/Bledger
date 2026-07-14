@@ -130,6 +130,15 @@ class PurchaseSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"items": "A purchase must have at least one line item."})
         if attrs.get("amount_paid", 0) < 0:
             raise serializers.ValidationError({"amount_paid": "Cannot be negative."})
+        # Server-side twin of the frontend's disabled "+ Record purchase"
+        # button for inactive suppliers -- deactivation means "we've
+        # stopped buying from them", so new purchases are rejected until
+        # the supplier is reactivated (PATCH is_active=true).
+        supplier = attrs.get("supplier")
+        if supplier is not None and not supplier.is_active:
+            raise serializers.ValidationError(
+                {"supplier": "This supplier is deactivated — reactivate it before recording a purchase."}
+            )
         return attrs
 
     def create(self, validated_data):
@@ -186,8 +195,11 @@ class PurchaseSerializer(serializers.ModelSerializer):
                     unit_cost=payload["unit_cost"],
                     line_total=payload["line_total"],
                 )
+                # updated_at/version included so the product row's
+                # optimistic-concurrency fields move with every stock
+                # write — same trio as StockAdjustmentSerializer.create().
                 payload["product"].stock_level = F("stock_level") + payload["quantity"]
-                payload["product"].save(update_fields=["stock_level"])
+                payload["product"].save(update_fields=["stock_level", "updated_at", "version"])
 
             # The amount paid at the moment of recording IS a payment --
             # give it its own PurchasePayment row so the ledger is

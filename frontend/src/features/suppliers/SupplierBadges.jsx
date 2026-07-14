@@ -34,6 +34,13 @@ const moneyFormatter = new Intl.NumberFormat("en-US");
 // much has been paid toward the total"). Omit them for the live
 // preview badge in RecordPurchaseForm, which doesn't have a real
 // amount_paid figure to attach until the purchase is actually saved.
+// Inactive marker for deactivated suppliers (Supplier.is_active=false)
+// -- neutral, not danger: deactivation is routine housekeeping (a
+// supplier you stopped buying from), not an error state.
+export function SupplierInactiveBadge() {
+  return <span className="sup-badge sup-badge-neutral">Inactive</span>;
+}
+
 export function PaymentStatusBadge({ status, amountPaid }) {
   const variant = VARIANTS[status] ?? "neutral";
   const label = LABELS[status] ?? status;

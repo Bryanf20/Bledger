@@ -102,6 +102,25 @@
   color: var(--color-text-tertiary);
   margin-top: 2px;
 }
+/* Deactivated suppliers stay listed (their history is still
+   reachable) but visually recede. */
+.sup-item.inactive .sup-item-name,
+.sup-item.inactive .sup-item-meta,
+.sup-item.inactive .sup-item-total {
+  opacity: 0.55;
+}
+.sup-item-inactive-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--color-background-secondary);
+  color: var(--color-text-secondary);
+  vertical-align: 1px;
+  opacity: 1; /* the tag itself stays readable inside the faded row */
+}
 .sup-list-footer {
   flex-shrink: 0;
   padding: 10px 12px;
@@ -130,6 +149,10 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  position: relative; /* InlineConfirm (deactivate-supplier) is
+                         absolutely positioned at inset:0 and must be
+                         clipped to this panel, not the viewport --
+                         same contract as POS's .pos-right-panel. */
 }
 .sup-empty-state {
   margin: auto;
@@ -473,15 +496,53 @@
   gap: 8px;
 }
 
+/* Back-to-list button in the detail header -- mobile-only (the list
+   is always visible beside the detail on desktop). */
+.sup-back-btn {
+  display: none;
+}
+
+/* Small viewports: one panel at a time. The list is the default view;
+   explicitly selecting a supplier adds .show-detail on .sup-body
+   (SuppliersScreen.jsx) which swaps to the detail panel, and the
+   detail header's back button clears the selection to return.
+   Desktop is untouched -- both panels render side by side and
+   .show-detail has no effect above 720px. */
 @media (max-width: 720px) {
   .sup-body {
     grid-template-columns: 1fr;
   }
   .sup-list-panel {
-    display: none; /* small-viewport behavior isn't specced for this
-                       screen yet -- hiding the list rather than
-                       rendering a broken cramped layout is a
-                       deliberate stopgap, flagged as an open item. */
+    border-right: none;
+  }
+  .sup-body:not(.show-detail) .sup-detail {
+    display: none;
+  }
+  .sup-body.show-detail .sup-list-panel {
+    display: none;
+  }
+  .sup-back-btn {
+    display: inline-block;
+    margin-bottom: 6px;
+    padding: 0;
+    border: none;
+    background: none;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+  }
+  .sup-back-btn:hover {
+    color: var(--color-text-primary);
+  }
+  .sup-detail-header {
+    flex-direction: column;
+  }
+  .sup-detail-header-actions {
+    flex-wrap: wrap;
+  }
+  .sup-stats-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

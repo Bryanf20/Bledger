@@ -1,10 +1,11 @@
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import F
 from django.utils import timezone
 from rest_framework import serializers
 
 from apps.core.utils.xaf import round_xaf
 from apps.inventory.models import Product
+from apps.sync.models import OutboxEntry
 from apps.sync.utils import write_outbox_entry
 
 from .models import HeldSale, Sale, SaleLineItem
@@ -67,6 +68,39 @@ class SaleSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         items_data = validated_data.pop("items")
+        # Sale.reference is unique at the DB level — two concurrent
+        # writers can compute the same "next" reference, in which case
+        # the loser's INSERT raises IntegrityError and the attempt is
+        # retried with a freshly computed reference. The whole atomic
+        # block re-runs in full (stock checks included) because an
+        # IntegrityError poisons the open transaction.
+        for attempt in range(5):
+            try:
+                return self._create_once(validated_data, items_data)
+            except IntegrityError:
+                if attempt == 4:
+                    raise
+
+    def _next_reference(self, year):
+        """
+        Highest existing sequence for `year`, plus one. Reads the most
+        recently *created* reference rather than count()-ing rows —
+        count-then-format collides whenever two sales race and stays
+        wrong forever once any sequence number is skipped. created_at
+        ordering also keeps working past sale 9999, where zero-padded
+        string ordering of the reference itself would not.
+        """
+        prefix = f"BLD-{year}-"
+        last = (
+            Sale.all_objects.filter(reference__startswith=prefix)
+            .order_by("-created_at")
+            .values_list("reference", flat=True)
+            .first()
+        )
+        last_seq = int(last.rsplit("-", 1)[1]) if last else 0
+        return f"{prefix}{last_seq + 1:04d}"
+
+    def _create_once(self, validated_data, items_data):
         request = self.context["request"]
         branch_id = request.branch_id
 
@@ -106,13 +140,7 @@ class SaleSerializer(serializers.ModelSerializer):
             tax_amount = 0  # no tax in Phase 1 — receipt shows "Tax (0%)"
             total_amount = subtotal + tax_amount
 
-            # Known limitation: this count-then-format approach can
-            # collide under real concurrent writes. Acceptable for
-            # Phase 1 standalone/SQLite (single till, low concurrency);
-            # revisit if/when Mode 1 multi-branch needs it collision-free.
-            year = timezone.now().year
-            count_this_year = Sale.all_objects.filter(reference__startswith=f"BLD-{year}-").count()
-            reference = f"BLD-{year}-{count_this_year + 1:04d}"
+            reference = self._next_reference(timezone.now().year)
 
             sale = Sale.objects.create(
                 branch_id=branch_id,
@@ -135,10 +163,13 @@ class SaleSerializer(serializers.ModelSerializer):
                     variance=0,
                     line_total=payload["line_total"],
                 )
+                # updated_at/version included so the product row's
+                # optimistic-concurrency fields move with every stock
+                # write — same trio as StockAdjustmentSerializer.create().
                 payload["product"].stock_level = F("stock_level") - payload["quantity"]
-                payload["product"].save(update_fields=["stock_level"])
+                payload["product"].save(update_fields=["stock_level", "updated_at", "version"])
 
-            write_outbox_entry(instance=sale, operation="insert", branch_id=branch_id)
+            write_outbox_entry(instance=sale, operation=OutboxEntry.INSERT, branch_id=branch_id)
 
         sale.refresh_from_db()
         return sale
@@ -156,9 +187,13 @@ class VoidSaleSerializer(serializers.Serializer):
 
         with transaction.atomic():
             for line_item in sale.line_items.select_related("product"):
-                Product.objects.select_for_update().filter(pk=line_item.product_id).update(
-                    stock_level=F("stock_level") + line_item.quantity
-                )
+                # Instance save(), not queryset .update() — .update()
+                # bypasses BaseModel.save(), so version/updated_at
+                # wouldn't move with the stock write like they do at
+                # every other stock-mutation site.
+                locked_product = Product.objects.select_for_update().get(pk=line_item.product_id)
+                locked_product.stock_level = F("stock_level") + line_item.quantity
+                locked_product.save(update_fields=["stock_level", "updated_at", "version"])
 
             sale.status = Sale.VOIDED
             sale.voided_by = request.user
@@ -168,7 +203,7 @@ class VoidSaleSerializer(serializers.Serializer):
                 update_fields=["status", "voided_by", "void_reason", "voided_at", "updated_at", "version"]
             )
 
-            write_outbox_entry(instance=sale, operation="update", branch_id=sale.branch_id)
+            write_outbox_entry(instance=sale, operation=OutboxEntry.UPDATE, branch_id=sale.branch_id)
 
         return sale
 

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { hasRole } from "../../components/RoleGuard";
-import Banner from "../../components/Banner";
 import InlineConfirm from "../../components/InlineConfirm";
 import ScreenTopbar from "../../components/ScreenTopbar";
 import ToastStack from "../../components/ToastStack";
@@ -75,9 +74,22 @@ export default function ReceiptScreen() {
 
   async function handleConfirmVoid() {
     if (!voidReason.trim()) return;
-    await voidSaleMutation.mutateAsync(voidReason.trim());
-    setShowVoidConfirm(false);
-    setVoidReason("");
+    try {
+      await voidSaleMutation.mutateAsync(voidReason.trim());
+      setShowVoidConfirm(false);
+      setVoidReason("");
+    } catch (err) {
+      // Same transient-action-feedback route as the PDF download above
+      // -- previously an unhandled rejection that left the confirm
+      // overlay stuck on "Voiding…" with no explanation.
+      setShowVoidConfirm(false);
+      showToast(
+        "error",
+        err.response?.data?.detail ||
+          err.response?.data?.[0] ||
+          "Couldn't void this sale. Please try again.",
+      );
+    }
   }
 
   if (isLoading) {

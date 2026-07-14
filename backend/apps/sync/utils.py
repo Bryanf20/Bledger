@@ -2,9 +2,11 @@
 Single write path into the outbox, so any app can add one line to its
 own atomic transaction rather than reimplementing the outbox row shape.
 
-NOT wired retroactively into apps.inventory's StockAdjustment /
-BranchPriceOverride writes — treat that as a separate, deliberate
-"backfill the outbox" task rather than something to fix incidentally.
+Wired into: sales (Sale create/void), suppliers (Purchase,
+PurchasePayment), inventory (StockAdjustment, BranchPriceOverride,
+Product deactivation — see tests/test_outbox_backfill.py). Still NOT
+covered: Product create/edit and Category writes — flagged as a
+remaining backfill task before Phase 2 sync goes live.
 """
 from .models import OutboxEntry
 

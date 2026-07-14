@@ -74,7 +74,14 @@ export default function SuppliersScreen() {
         )}
 
         {!isError && (
-          <div className="sup-body">
+          /* `show-detail` drives the <720px one-panel-at-a-time flow
+             (see SuppliersScreen.css's media query): an EXPLICIT
+             selection (selectedId set) switches to the detail panel;
+             the detail header's back button clears it to return to the
+             list. Desktop is unaffected -- both panels always render,
+             and selectedSupplier still falls back to the first
+             supplier when nothing is explicitly selected. */
+          <div className={`sup-body${selectedId !== null ? " show-detail" : ""}`}>
             <SupplierList
               suppliers={visibleSuppliers}
               search={search}
@@ -90,6 +97,7 @@ export default function SuppliersScreen() {
               purchases={supplierPurchases}
               isLoading={isLoading}
               onEditSupplier={() => setFormPanel({ mode: "edit", supplier: selectedSupplier })}
+              onBack={() => setSelectedId(null)}
               onSuccess={showSuccess}
               onError={showError}
             />

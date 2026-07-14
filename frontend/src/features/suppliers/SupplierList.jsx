@@ -35,7 +35,7 @@ export default function SupplierList({
           suppliers.map((s) => (
             <div
               key={s.id}
-              className={`sup-item${selectedId === s.id ? " active" : ""}`}
+              className={`sup-item${selectedId === s.id ? " active" : ""}${s.is_active ? "" : " inactive"}`}
               onClick={() => onSelect(s.id)}
               role="button"
               tabIndex={0}
@@ -43,7 +43,10 @@ export default function SupplierList({
                 if (e.key === "Enter" || e.key === " ") onSelect(s.id);
               }}
             >
-              <div className="sup-item-name">{s.name}</div>
+              <div className="sup-item-name">
+                {s.name}
+                {!s.is_active && <span className="sup-item-inactive-tag">Inactive</span>}
+              </div>
               <div className="sup-item-meta">
                 {s.area ? `📍 ${s.area}` : "No area set"}
                 {s.phone ? ` · ${s.phone}` : ""}
