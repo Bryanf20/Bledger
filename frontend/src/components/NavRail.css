@@ -3,6 +3,13 @@
    sibling in a layout route. Width matches the padding-left added to
    the shared .xxx-page group in screen-layout.css -- keep these two
    numbers in sync if either changes. */
+/* Themed neutral surface (changed from the fixed brand-navy panel):
+   the rail now reads from the same surface/text/border tokens as every
+   screen, so it follows light/dark mode instead of staying a constant
+   blue block. Selection styling matches the app-wide convention
+   (background-success + green accent, same as .sup-item.active /
+   category pills); the small "B" brand tile keeps the brand green so
+   the brand identity survives without painting the whole rail. */
 .nav-rail {
   position: fixed;
   top: 0;
@@ -13,7 +20,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: var(--color-brand-navy);
+  background: var(--color-background-secondary);
+  border-right: 0.5px solid var(--color-border-tertiary);
   padding: 12px 0;
 }
 
@@ -21,7 +29,7 @@
   width: 32px;
   height: 32px;
   border-radius: var(--border-radius-md);
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--color-brand-green);
   color: #fff;
   font-size: 15px;
   font-weight: 700;
@@ -49,15 +57,15 @@
   align-items: center;
   gap: 3px;
   text-decoration: none;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-text-tertiary);
 }
 .nav-rail-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--color-background-tertiary);
+  color: var(--color-text-primary);
 }
 .nav-rail-item.active {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  background: var(--color-background-success);
+  color: var(--color-text-success);
 }
 .nav-rail-icon {
   font-size: 17px;
@@ -89,6 +97,8 @@
     flex-direction: row;
     padding: 0 8px;
     justify-content: space-around;
+    border-right: none;
+    border-top: 0.5px solid var(--color-border-tertiary);
   }
   .nav-rail-brand {
     display: none;

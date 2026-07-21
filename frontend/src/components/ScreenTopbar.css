@@ -33,6 +33,14 @@
   gap: 12px;
 }
 
+/* Live clock (TopbarClock in ScreenTopbar.jsx). tabular-nums so the
+   digits don't shift the meta row's layout when the minute changes. */
+.screen-topbar-clock {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
 /* Reusable "synced" indicator dot -- POS's topbar meta uses it today;
    any future screen showing sync status can reuse the same class
    instead of redeclaring it. */
