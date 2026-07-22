@@ -61,7 +61,13 @@ class BaseModel(models.Model):
         from django.utils import timezone
 
         self.deleted_at = timezone.now()
-        self.save(update_fields=["deleted_at", "updated_at"])
+        # "version" must be in update_fields: save() below increments it
+        # in memory, but a save() restricted to update_fields writes only
+        # the listed columns — so without it the increment would be
+        # silently discarded and the row's optimistic-concurrency counter
+        # would not move on delete. Same trio every other stock/state
+        # write uses.
+        self.save(update_fields=["deleted_at", "updated_at", "version"])
 
     def save(self, *args, **kwargs):
         if not self._state.adding:

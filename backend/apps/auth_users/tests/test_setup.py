@@ -38,6 +38,11 @@ def test_setup_creates_branch_and_owner_and_logs_in(api_client):
     assert branch.setup_complete is True
     assert branch.users.count() == 1
     assert branch.users.first().username == "ayuk"
+    # Branch.code is derived at setup (Phase 2 §8.1) — standalone
+    # installs have no cloud to assign one, and it is non-nullable
+    # because every sale reference embeds it.
+    assert branch.code == "BUE"  # from "Buea Main Branch"
+    assert response.data["user"]["branch"]["code"] == "BUE"
 
 
 @pytest.mark.django_db

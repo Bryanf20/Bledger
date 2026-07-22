@@ -33,7 +33,13 @@ export async function fetchProducts() {
 
 export async function createSale(payload) {
   const { data } = await apiClient.post("/sales/", payload);
-  return data; // Sale -- includes reference (BLD-YYYY-NNNN) and line_items
+  // Sale -- includes reference and line_items. Reference format is
+  // BLD-<branch_code>-YYYY-NNNN (e.g. BLD-BUE-2026-0001); the branch
+  // code keeps references unique once several branches share a cloud
+  // database (Phase 2 design §8.1). Treat it as an opaque string —
+  // ReceiptScreen takes the last hyphen-separated segment for the
+  // "Sale #0001" display, which holds across the format change.
+  return data;
 }
 
 export async function fetchHeldSales() {

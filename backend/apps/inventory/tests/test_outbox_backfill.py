@@ -27,6 +27,7 @@ def branch(db):
         phone="677123456",
         deployment_mode="standalone",
         setup_complete=True,
+        code="BUE",
     )
 
 
@@ -107,5 +108,96 @@ def test_product_deactivation_writes_outbox_entry(manager_client, product):
 
     entry = OutboxEntry.objects.filter(record_id=product.id).order_by("created_at").last()
     assert entry is not None
+    # UPDATE, not DELETE: a deactivated product still exists and still
+    # appears on historical receipts (design doc B.3) -- it is not a
+    # tombstone.
     assert entry.operation == OutboxEntry.UPDATE
     assert entry.branch_id == BRANCH_ID
+
+
+# ---------------------------------------------------------------------------
+# Catalogue coverage -- added by Phase 2 §8.2.
+#
+# Product create/edit and every Category write previously wrote NO
+# outbox entry. Since the catalogue is precisely the data that has to
+# propagate HQ -> branches (feasibility §6), those writes would have
+# been invisible to the cloud: locally correct, never replicated.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_product_create_writes_outbox_entry(manager_client, category):
+    resp = manager_client.post(
+        "/api/v1/products/",
+        {
+            "name": "Golden Penny semolina 2kg",
+            "category": str(category.id),
+            "unit": "bag",
+            "retail_price": 2800,
+        },
+        format="json",
+    )
+    assert resp.status_code == 201
+
+    entry = OutboxEntry.objects.filter(record_id=resp.data["id"]).first()
+    assert entry is not None
+    assert entry.operation == OutboxEntry.INSERT
+    assert entry.table_name == "inventory_product"
+    assert entry.branch_id == BRANCH_ID
+
+
+@pytest.mark.django_db
+def test_product_edit_writes_outbox_entry(manager_client, product):
+    resp = manager_client.patch(
+        f"/api/v1/products/{product.id}/", {"retail_price": 4800}, format="json"
+    )
+    assert resp.status_code == 200
+
+    entry = OutboxEntry.objects.filter(record_id=product.id).order_by("created_at").last()
+    assert entry is not None
+    assert entry.operation == OutboxEntry.UPDATE
+    # The payload carries the new price, not the old one -- the snapshot
+    # is taken after the write inside the same transaction.
+    assert entry.payload["retail_price"] == 4800
+
+
+@pytest.mark.django_db
+def test_category_create_writes_outbox_entry(manager_client):
+    resp = manager_client.post(
+        "/api/v1/categories/", {"name": "Beverages", "sort_order": 2}, format="json"
+    )
+    assert resp.status_code == 201
+
+    entry = OutboxEntry.objects.filter(record_id=resp.data["id"]).first()
+    assert entry is not None
+    assert entry.operation == OutboxEntry.INSERT
+    assert entry.table_name == "inventory_category"
+
+
+@pytest.mark.django_db
+def test_category_edit_writes_outbox_entry(manager_client, category):
+    resp = manager_client.patch(
+        f"/api/v1/categories/{category.id}/", {"name": "Grains & cereals"}, format="json"
+    )
+    assert resp.status_code == 200
+
+    entry = OutboxEntry.objects.filter(record_id=category.id).order_by("created_at").last()
+    assert entry is not None
+    assert entry.operation == OutboxEntry.UPDATE
+    assert entry.payload["name"] == "Grains & cereals"
+
+
+@pytest.mark.django_db
+def test_category_delete_writes_tombstone(manager_client, category):
+    """
+    Categories soft-delete, and the cloud needs a DELETE tombstone it
+    can propagate -- unlike product deactivation, which is an ordinary
+    field change.
+    """
+    resp = manager_client.delete(f"/api/v1/categories/{category.id}/")
+    assert resp.status_code == 204
+
+    entry = OutboxEntry.objects.filter(record_id=category.id).order_by("created_at").last()
+    assert entry is not None
+    assert entry.operation == OutboxEntry.DELETE
+    assert entry.payload["deleted_at"] is not None

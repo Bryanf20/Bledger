@@ -11,12 +11,50 @@ their own lifecycle (password hashing, last_login, permissions) that
 doesn't fit the synced-table shape (branch_id, deleted_at, synced_at,
 version) BaseModel is built for.
 """
+import re
 import uuid
 
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import Group, Permission, PermissionsMixin
 from django.db import models
+
+# Fallback when a name yields no usable letters (e.g. a purely numeric
+# or non-Latin business name) -- "HQ" matches the historical default
+# BRANCH_ID, so a single-install shop keeps a familiar-looking code.
+DEFAULT_BRANCH_CODE = "HQ"
+
+
+def derive_branch_code(*names, taken=()):
+    """
+    Best-effort short code from a branch/business name, for standalone
+    installs where no cloud is present to assign one (Phase 2 design
+    §8.1 / §2.3 -- connected mode assigns codes at enrolment instead).
+
+    Tries each name in order, taking the first 3 letters of the first
+    word ("Buea Main Branch" -> "BUE"). Falls back to DEFAULT_BRANCH_CODE,
+    then appends a numeric suffix until the result isn't in `taken`.
+    Uniqueness matters because Branch.code is unique -- setup would
+    otherwise fail on the second branch with a similar name.
+    """
+    candidate = ""
+    for name in names:
+        letters = re.sub(r"[^A-Za-z]", "", name or "")
+        if letters:
+            candidate = letters[:3].upper()
+            break
+    candidate = candidate or DEFAULT_BRANCH_CODE
+
+    taken = {c.upper() for c in taken}
+    if candidate not in taken:
+        return candidate
+
+    # Suffix until free. max_length=8 leaves ample room.
+    for suffix in range(2, 1000):
+        attempt = f"{candidate}{suffix}"
+        if attempt not in taken:
+            return attempt
+    raise ValueError("Could not derive a unique branch code.")
 
 
 class Branch(models.Model):
@@ -41,6 +79,22 @@ class Branch(models.Model):
     address = models.CharField(max_length=255, blank=True, default="")
     phone = models.CharField(max_length=32, blank=True, default="")
     receipt_footer = models.CharField(max_length=255, blank=True, default="")
+
+    # Short uppercase branch discriminator (e.g. "BUE", "DLA"), embedded
+    # in every Sale.reference as BLD-<code>-<year>-<seq> (Phase 2 design
+    # §8.1). Without it, two branches independently generate
+    # BLD-2026-0001 and collide in the shared cloud database, where the
+    # second branch's push would be permanently rejected.
+    #
+    # Unique so no two branches can claim the same discriminator. In
+    # Phase 2 connected mode this is assigned by the cloud at enrolment;
+    # in standalone it's derived from the branch/business name at setup
+    # (see derive_branch_code()) and only ever seen by one install.
+    code = models.CharField(
+        max_length=8,
+        unique=True,
+        help_text="Short uppercase code used in sale references, e.g. BUE.",
+    )
 
     deployment_mode = models.CharField(
         max_length=16, choices=DEPLOYMENT_MODE_CHOICES, default=DEPLOYMENT_STANDALONE
@@ -108,7 +162,16 @@ class BledgerUserManager(BaseUserManager):
         if branch is None:
             branch, _ = Branch.objects.get_or_create(
                 business_name="Default Business",
-                defaults={"deployment_mode": Branch.DEPLOYMENT_STANDALONE},
+                defaults={
+                    "deployment_mode": Branch.DEPLOYMENT_STANDALONE,
+                    # code is unique and non-nullable; derive one here so
+                    # `manage.py createsuperuser` still works on a fresh
+                    # install with no Branch rows.
+                    "code": derive_branch_code(
+                        "Default Business",
+                        taken=Branch.objects.values_list("code", flat=True),
+                    ),
+                },
             )
 
         return self._create_user(

@@ -5,6 +5,7 @@ Role split mirrors the Inventory screen (design doc B.3): owner/manager
 get full write access; cashier gets read-only (the "Add product" button
 and Adjust/Edit row actions are hidden client-side, and enforced here).
 """
+from django.db import transaction
 from django.db.models import Q
 from rest_framework import mixins, viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -50,11 +51,27 @@ class CategoryViewSet(BranchScopedQuerysetMixin, viewsets.ModelViewSet):
             return [IsAuthenticated(), IsManagerOrOwner()]
         return [IsAuthenticated(), IsCashierOrAbove()]
 
+    # Categories are part of the catalogue layer that propagates
+    # HQ -> branches (feasibility §6), so every mutation needs an outbox
+    # entry. These were missing until Phase 2 §8.2 — the writes worked
+    # locally but would never have reached the cloud.
     def perform_create(self, serializer):
-        serializer.save(branch_id=self.request.branch_id)
+        with transaction.atomic():
+            instance = serializer.save(branch_id=self.request.branch_id)
+            write_outbox_entry(instance=instance, operation=OutboxEntry.INSERT)
+
+    def perform_update(self, serializer):
+        with transaction.atomic():
+            instance = serializer.save()
+            write_outbox_entry(instance=instance, operation=OutboxEntry.UPDATE)
 
     def perform_destroy(self, instance):
-        instance.soft_delete()
+        with transaction.atomic():
+            instance.soft_delete()
+            # DELETE, not UPDATE: soft_delete() sets deleted_at, and the
+            # cloud needs a tombstone it can propagate to other branches
+            # rather than an ordinary field change.
+            write_outbox_entry(instance=instance, operation=OutboxEntry.DELETE)
 
 
 class ProductViewSet(BranchScopedQuerysetMixin, viewsets.ModelViewSet):
@@ -78,19 +95,34 @@ class ProductViewSet(BranchScopedQuerysetMixin, viewsets.ModelViewSet):
         context["request"] = self.request
         return context
 
+    # Product create/edit are the catalogue writes that must reach
+    # branches (feasibility §6) — added in Phase 2 §8.2. Deactivation
+    # (perform_destroy) already wrote an entry before this change.
     def perform_create(self, serializer):
-        serializer.save(branch_id=self.request.branch_id, source="manual")
+        with transaction.atomic():
+            instance = serializer.save(branch_id=self.request.branch_id, source="manual")
+            write_outbox_entry(instance=instance, operation=OutboxEntry.INSERT)
+
+    def perform_update(self, serializer):
+        with transaction.atomic():
+            instance = serializer.save()
+            write_outbox_entry(instance=instance, operation=OutboxEntry.UPDATE)
 
     def perform_destroy(self, instance):
-        instance.is_active = False
-        instance.save(update_fields=["is_active", "updated_at", "version"])
-        # branch_id defaults to instance.branch_id inside
-        # write_outbox_entry() -- not request.branch_id, since a
-        # deactivated product's own branch_id is the correct outbox
-        # scope even in the (currently theoretical) case of a manager
-        # deactivating an HQ-catalogue row surfaced through
-        # BranchScopedQuerysetMixin's include_hq_catalogue union.
-        write_outbox_entry(instance=instance, operation=OutboxEntry.UPDATE)
+        # Deactivation, not deletion (design doc B.3) -- so this stays
+        # an UPDATE rather than a DELETE tombstone: the row still exists
+        # and still appears on historical receipts, it just drops out of
+        # the POS grid.
+        with transaction.atomic():
+            instance.is_active = False
+            instance.save(update_fields=["is_active", "updated_at", "version"])
+            # branch_id defaults to instance.branch_id inside
+            # write_outbox_entry() -- not request.branch_id, since a
+            # deactivated product's own branch_id is the correct outbox
+            # scope even in the (currently theoretical) case of a manager
+            # deactivating an HQ-catalogue row surfaced through
+            # BranchScopedQuerysetMixin's include_hq_catalogue union.
+            write_outbox_entry(instance=instance, operation=OutboxEntry.UPDATE)
 
 
 class BranchPriceOverrideViewSet(

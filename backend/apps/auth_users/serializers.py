@@ -6,7 +6,7 @@ from django.contrib.auth import authenticate
 from django.conf import settings
 from rest_framework import serializers
 
-from .models import BledgerUser, Branch
+from .models import BledgerUser, Branch, derive_branch_code
 
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -16,6 +16,10 @@ class BranchSerializer(serializers.ModelSerializer):
             "id",
             "business_name",
             "branch_name",
+            # Exposed so the frontend can display/identify the branch a
+            # sale reference belongs to without parsing the reference
+            # string (Phase 2 design §8.1).
+            "code",
             "address",
             "phone",
             "receipt_footer",
@@ -170,14 +174,25 @@ class SetupSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
+        branch_name = validated_data.get("branch_name", "")
+        # Branch.code is unique and embedded in every sale reference
+        # (Phase 2 design §8.1). Standalone installs have no cloud to
+        # assign one, so derive it from the branch name (falling back to
+        # the business name), skipping any code already taken.
+        code = derive_branch_code(
+            branch_name,
+            validated_data["business_name"],
+            taken=Branch.objects.values_list("code", flat=True),
+        )
         branch = Branch.objects.create(
             business_name=validated_data["business_name"],
-            branch_name=validated_data.get("branch_name", ""),
+            branch_name=branch_name,
             address=validated_data.get("address", ""),
             phone=validated_data["phone"],
             receipt_footer=validated_data.get("receipt_footer", ""),
             deployment_mode=getattr(settings, "DEPLOYMENT_MODE", Branch.DEPLOYMENT_STANDALONE),
             setup_complete=True,
+            code=code,
         )
         owner = BledgerUser.objects.create_user(
             username=validated_data["username"],

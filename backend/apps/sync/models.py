@@ -34,6 +34,14 @@ class OutboxEntry(models.Model):
     # the time the sync engine runs).
     payload = models.JSONField()
 
+    # Which version of this table's payload contract the snapshot above
+    # was written against (apps.sync.registry.SYNCED_TABLES). A branch
+    # that has been offline across an app upgrade will push entries
+    # written by the older code; without this the cloud would have to
+    # infer the contract from the payload's shape, which is guesswork
+    # (Phase 2 design §8.3).
+    schema_version = models.PositiveIntegerField(default=1)
+
     branch_id = models.CharField(max_length=64, db_index=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

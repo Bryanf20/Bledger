@@ -134,8 +134,14 @@ Conventions:
 
 Remaining (deferred to Phase 2 by design):
 
-- **Outbox coverage is partial**: Sale, Purchase, PurchasePayment, StockAdjustment, BranchPriceOverride, and Product *deactivation* write outbox entries; **Product create/edit and Category writes do not yet**. Must be backfilled before Phase 2 sync goes live.
-- Phase 2 sync engine (`sync/engine.py`, `pull.py`, `conflict.py`, `tasks.py`) not yet built — only the outbox table and writer exist.
+- Phase 2 sync engine (`sync/engine.py`, `pull.py`, `conflict.py`, `tasks.py`) not yet built — only the outbox table, registry, and writer exist.
+
+Resolved in Phase 2 Stage 1 (see `docs/PHASE2_DESIGN.md` §8):
+
+- ~~Outbox coverage is partial~~ — Product create/edit and all Category writes now emit entries. `apps/sync/registry.py` declares every table as either synced (with a payload schema version) or explicitly never-synced, and a test fails the build if a new `BaseModel` is left unclassified.
+- ~~Outbox payload had no contract~~ — `serialize_instance()` applies per-type rules and `OutboxEntry.schema_version` records which contract each entry was written against.
+- ~~`Sale.reference` would collide across branches~~ — now `BLD-<branch_code>-<year>-<seq>`, with `Branch.code` unique per branch.
+- ~~`soft_delete()` dropped its version increment~~ — `update_fields` now includes `"version"`.
 
 Resolved during Phase 1 close-out (kept for the record):
 

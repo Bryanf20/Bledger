@@ -4,3 +4,9 @@ django-environ>=0.11,<0.12
 django-cors-headers>=4.3,<4.4
 django-filter>=24.2,<24.3
 weasyprint>=62.0,<63.0
+# WeasyPrint 62.x does not cap pydyf, but pydyf 0.11 changed the Stream
+# API (Stream.transform was moved/removed), so a fresh install picks up
+# pydyf 0.12 and every PDF path dies with
+# "AttributeError: 'super' object has no attribute 'transform'".
+# Pin until WeasyPrint is upgraded past 62.x.
+pydyf>=0.10.0,<0.11

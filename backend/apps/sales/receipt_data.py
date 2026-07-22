@@ -33,8 +33,10 @@ def build_receipt_context(sale):
         "time": created_local.strftime("%H:%M"),
         "cashier_name": sale.cashier.name,
         # "Sale #0047" on the receipt (design doc B.2 / 02_receipt.html)
-        # is the per-year sequence tail of the BLD-YYYY-NNNN reference,
-        # not the reference itself.
+        # is the sequence tail of the BLD-<branch_code>-YYYY-NNNN
+        # reference, not the reference itself. Taking the last
+        # hyphen-separated segment keeps this correct across the Phase 2
+        # §8.1 format change — the sequence has always been last.
         "sale_number": sale.reference.rsplit("-", 1)[-1],
         "reference": sale.reference,
         "line_items": line_items,

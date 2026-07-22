@@ -81,16 +81,28 @@ class SaleSerializer(serializers.ModelSerializer):
                 if attempt == 4:
                     raise
 
-    def _next_reference(self, year):
+    def _next_reference(self, year, branch_code):
         """
-        Highest existing sequence for `year`, plus one. Reads the most
-        recently *created* reference rather than count()-ing rows —
-        count-then-format collides whenever two sales race and stays
-        wrong forever once any sequence number is skipped. created_at
-        ordering also keeps working past sale 9999, where zero-padded
-        string ordering of the reference itself would not.
+        Highest existing sequence for this branch and `year`, plus one.
+
+        Format is BLD-<branch_code>-<year>-<seq> (Phase 2 design §8.1).
+        The branch code is what makes references unique across a
+        multi-branch cloud: without it every branch independently
+        generates BLD-2026-0001 and only the first push survives the
+        unique constraint.
+
+        Reads the most recently *created* reference rather than
+        count()-ing rows — count-then-format collides whenever two sales
+        race and stays wrong forever once any sequence number is skipped.
+        created_at ordering also keeps working past sale 9999, where
+        zero-padded string ordering of the reference itself would not.
+
+        The sequence stays per-branch-per-year, so a branch never needs
+        to coordinate with the cloud (or any other branch) to allocate
+        its next number — which is what keeps sale creation fully
+        offline-capable.
         """
-        prefix = f"BLD-{year}-"
+        prefix = f"BLD-{branch_code}-{year}-"
         last = (
             Sale.all_objects.filter(reference__startswith=prefix)
             .order_by("-created_at")
@@ -140,7 +152,11 @@ class SaleSerializer(serializers.ModelSerializer):
             tax_amount = 0  # no tax in Phase 1 — receipt shows "Tax (0%)"
             total_amount = subtotal + tax_amount
 
-            reference = self._next_reference(timezone.now().year)
+            # Branch code comes from the cashier's own Branch row, not
+            # settings.BRANCH_ID -- Phase 2 §2.3 moves branch identity
+            # onto the Branch record, and the cashier is always a member
+            # of exactly the branch this sale belongs to.
+            reference = self._next_reference(timezone.now().year, request.user.branch.code)
 
             sale = Sale.objects.create(
                 branch_id=branch_id,

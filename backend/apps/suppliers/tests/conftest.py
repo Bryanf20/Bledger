@@ -21,6 +21,7 @@ def branch(db):
         phone="677123456",
         deployment_mode="standalone",
         setup_complete=True,
+        code="BUE",
     )
 
 

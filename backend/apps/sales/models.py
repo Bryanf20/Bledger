@@ -51,7 +51,11 @@ class Sale(BaseModel):
     voided_at = models.DateTimeField(null=True, blank=True)
 
     # Human-facing sale ref for the receipt/dashboard (design doc B.2):
-    # BLD-YYYY-NNNN. Not the pk — a separate per-year sequence.
+    # BLD-<branch_code>-YYYY-NNNN. Not the pk — a separate
+    # per-branch-per-year sequence. The branch code is what keeps
+    # references unique once several branches share a cloud database
+    # (Phase 2 design §8.1); without it every branch would generate
+    # BLD-2026-0001 independently.
     reference = models.CharField(max_length=20, unique=True, editable=False)
 
     class Meta(BaseModel.Meta):
