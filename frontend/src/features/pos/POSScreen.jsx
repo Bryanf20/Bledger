@@ -11,6 +11,7 @@ import { useCreateSale } from "../../hooks/useCreateSale";
 import { useHeldSales, useHoldSale } from "../../hooks/useHeldSales";
 import { useCartStore } from "../../store/cartStore";
 import { useToasts } from "../../hooks/useToasts";
+import { useBarcodeInput } from "../../hooks/useBarcodeInput";
 import ProductGrid from "./ProductGrid";
 import Cart from "./Cart";
 import PaymentPanel from "./PaymentPanel";
@@ -52,7 +53,54 @@ export default function POSScreen() {
   const [action, setAction] = useState(null);
   const [holdLabel, setHoldLabel] = useState("");
 
+  // Scanning is on by default; the topbar toggle lets a cashier turn it
+  // off if a misbehaving scanner is interfering.
+  const [scanEnabled, setScanEnabled] = useState(true);
+
   const productsById = useMemo(() => new Map((products ?? []).map((p) => [p.id, p])), [products]);
+
+  // Barcode -> product lookup, client-side (same "fetch all, resolve
+  // locally" convention as the rest of POS). Only products that actually
+  // carry a barcode are indexed.
+  const productsByBarcode = useMemo(() => {
+    const map = new Map();
+    for (const p of products ?? []) {
+      if (p.barcode) map.set(p.barcode, p);
+    }
+    return map;
+  }, [products]);
+
+  function handleScan(code) {
+    const product = productsByBarcode.get(code);
+    if (!product) {
+      showToast("error", `No product found for barcode ${code}.`);
+      return;
+    }
+    if (!product.is_active) {
+      showToast("error", `${product.name} is deactivated and can't be sold.`);
+      return;
+    }
+    if (product.stock_level <= 0) {
+      showToast("error", `${product.name} is out of stock.`);
+      return;
+    }
+    // Respect the same stock ceiling addItem enforces: warn if the scan
+    // would exceed known stock rather than silently no-op'ing.
+    const inCart = items.find((i) => i.productId === product.id)?.quantity ?? 0;
+    if (inCart + 1 > product.stock_level) {
+      showToast("error", `Only ${product.stock_level} of ${product.name} in stock.`);
+      return;
+    }
+    addItem(product);
+    showToast("success", `Added ${product.name}.`);
+  }
+
+  // Suspend scanning while a modal/confirmation is up, so a stray scan
+  // can't fire behind the held-sales drawer or a hold/clear confirm.
+  useBarcodeInput({
+    onScan: handleScan,
+    enabled: scanEnabled && !showHeldDrawer && action === null,
+  });
 
   const categories = useMemo(() => {
     const seen = new Map();
@@ -170,8 +218,17 @@ export default function POSScreen() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
-                <button type="button" className="pos-icon-btn" disabled title="Phase 2">
-                  ⌗  barcode
+                <button
+                  type="button"
+                  className={`pos-icon-btn${scanEnabled ? " sel" : ""}`}
+                  onClick={() => setScanEnabled((v) => !v)}
+                  title={
+                    scanEnabled
+                      ? "Barcode scanning is on — scan any item. Click to turn off."
+                      : "Barcode scanning is off. Click to turn on."
+                  }
+                >
+                  ⌗ {scanEnabled ? "scan on" : "scan off"}
                 </button>
                 <button type="button" className="pos-icon-btn pos-held-btn" onClick={() => setShowHeldDrawer(true)}>
                   ⏸ {heldSales?.length ?? 0} held

@@ -36,6 +36,7 @@ export default function ProductFormPanel({ mode, product, categories, onClose, o
       category: product?.category ?? "",
       unit: product?.unit ?? "unit",
       retail_price: product?.retail_price ?? "",
+      barcode: product?.barcode ?? "",
       low_stock_threshold: product?.low_stock_threshold ?? 5,
       has_bulk: Boolean(product?.bulk_price && product?.bulk_min_qty),
       bulk_price: product?.bulk_price ?? "",
@@ -66,6 +67,7 @@ export default function ProductFormPanel({ mode, product, categories, onClose, o
       category: values.category,
       unit: values.unit.trim() || "unit",
       retail_price: Number(values.retail_price),
+      barcode: values.barcode.trim(),
       low_stock_threshold: Number(values.low_stock_threshold),
       bulk_price: values.has_bulk ? Number(values.bulk_price) : null,
       bulk_min_qty: values.has_bulk ? Number(values.bulk_min_qty) : null,
@@ -205,6 +207,20 @@ export default function ProductFormPanel({ mode, product, categories, onClose, o
                 )}
               </div>
             )}
+
+            <div>
+              <label className="inv-field-label" htmlFor="barcode">
+                Barcode <span className="inv-field-hint">(optional — scan or type)</span>
+              </label>
+              <input
+                id="barcode"
+                className="inv-field-input"
+                placeholder="Leave blank for goods with no barcode"
+                autoComplete="off"
+                {...register("barcode")}
+              />
+              {errors.barcode && <div className="inv-field-error">{errors.barcode.message}</div>}
+            </div>
 
             <div>
               <label className="inv-field-label" htmlFor="low_stock_threshold">Low stock alert threshold</label>

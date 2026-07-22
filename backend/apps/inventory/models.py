@@ -98,8 +98,24 @@ class Product(BaseModel):
     is_active = models.BooleanField(default=True)
     source = models.CharField(max_length=10, choices=PRODUCT_SOURCE_CHOICES, default="manual")
 
+    # Optional scan code (Phase 2 design §5). Deliberately blank by
+    # default and NOT required: most goods in a Cameroonian provision
+    # store — rice by the bag, sachet water, loose produce — carry no
+    # barcode at all, so this is an accelerator for the ones that do,
+    # never a gate on selling. Unique per branch only when actually set
+    # (the constraint below excludes the empty string), so any number of
+    # products may have no barcode.
+    barcode = models.CharField(max_length=64, blank=True, default="", db_index=True)
+
     class Meta:
         ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["branch_id", "barcode"],
+                condition=models.Q(deleted_at__isnull=True) & ~models.Q(barcode=""),
+                name="unique_barcode_per_branch",
+            )
+        ]
 
     def __str__(self):
         return self.name

@@ -270,6 +270,17 @@ Camera scanning (via a library such as `zxing-js` or the native `BarcodeDetector
 
 POS (add to cart), inventory (find product), stock intake / record purchase (add line item), and product create/edit (assign barcode).
 
+### 5.5 Implementation notes (Stage 2, step 3 — ✅ done)
+
+USB scanning shipped; camera (§5.3) and stock-intake scan-to-add-line remain follow-ons.
+
+- **`Product.barcode`** — `CharField(max_length=64, blank, db_index)`, optional. A partial `UniqueConstraint` on `(branch_id, barcode)` excludes the empty string and soft-deleted rows, so any number of products may carry no barcode while set ones are unique per branch (and the *same* manufacturer code may legitimately exist at a different branch). Exposed on `ProductSerializer` with a `validate_barcode` that turns the would-be `IntegrityError` into a clean 400. Migration `inventory.0004_product_barcode`.
+- **No schema-version bump.** Barcode joins the `inventory_product` payload, but the sync engine isn't built and no cloud has consumed the v1 contract yet, so v1 is simply redefined to include it rather than bumped to v2 (§8.3). Product writes still emit outbox entries, now carrying `barcode` — covered by a test.
+- **`useBarcodeInput` hook** (`frontend/src/hooks/`) — global keydown listener that tells scanner from typist purely by speed: a burst of characters each within `maxIntervalMs` (40ms) of the last, terminated by Enter, of at least `minLength` (3). The terminal Enter is `preventDefault`ed on a recognised scan so it can't submit a form. Accepted rough edge: if a field is focused mid-scan the digits also land in it — documented in the hook.
+- **POS scan-to-cart** — the previously-disabled barcode button is now a scanning on/off toggle (default on). A scan resolves the code against a client-side barcode→product map (same "fetch all, resolve locally" convention as the rest of POS), then adds to cart with the same stock ceiling `addItem` enforces, or shows a toast (no match / inactive / out of stock / would exceed stock). Scanning is suspended while a modal or confirm is open.
+- **Product form** — a barcode input on create/edit; server-side duplicate errors surface via the existing toast path.
+- **Verification** — backend fully tested (`inventory/tests/test_barcode.py`, 7). Frontend transform-checked as valid JSX/ESM via esbuild but **not** run through `npm run build`/`oxlint` (the sandbox has no project `node_modules`); do that in WSL.
+
 ---
 
 ## 6. Workstream E — Purchase orders & supplier payments **[PROPOSED]**
@@ -527,8 +538,8 @@ These ship without any cloud, so they reach real users fast and de-risk the sche
 
 | # | Step | Delivers |
 |---|---|---|
-| 3 | Barcode — `Product.barcode`, USB scanner support at POS/intake (§5) | Faster till; smallest workstream |
-| 4 | PIN-approval primitive — `/auth/verify-pin/` with rate limiting (§3.2) | Shared by haggling and credit |
+| 3 | Barcode — `Product.barcode`, USB scanner support at POS/intake (§5) | Faster till; smallest workstream — ✅ **done** |
+| 4 | PIN-approval primitive — `/auth/verify-pin/` with rate limiting (§3.2) | Shared by haggling and credit — **next** |
 | 5 | **Cost tracking (§7A)** — snapshot fixes, `ProductPriceHistory`, WAC on `Product`, COGS on sale lines, migration backfill | Profit becomes computable at all |
 | 6 | Negotiated pricing (§3) — bounds config, POS price editing, server enforcement, variance reporting | The culturally-critical feature |
 | 7 | Customer accounts & credit (§4) — models, POS integration, Customers screen, aged-debt report | Removes a real blind spot in daily cash |

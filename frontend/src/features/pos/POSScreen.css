@@ -84,6 +84,12 @@
   cursor: not-allowed;
   opacity: 0.5;
 }
+/* Barcode scan toggle when active — green like other "on" states. */
+.pos-icon-btn.sel {
+  border-color: var(--color-brand-green);
+  color: var(--color-text-success);
+  background: var(--color-background-success);
+}
 .pos-held-btn {
   border-color: #ef9f27;
   color: var(--color-text-warning);

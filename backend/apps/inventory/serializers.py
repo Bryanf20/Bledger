@@ -45,11 +45,33 @@ class ProductSerializer(serializers.ModelSerializer):
             "id", "name", "description", "category", "category_name", "unit",
             "retail_price", "bulk_price", "bulk_min_qty",
             "stock_level", "low_stock_threshold", "stock_status",
-            "is_active", "source",
+            "is_active", "source", "barcode",
             "effective_retail_price", "effective_bulk_price",
             "created_at", "updated_at",
         ]
         read_only_fields = ["id", "stock_level", "source", "created_at", "updated_at"]
+
+    def validate_barcode(self, value):
+        # Empty is always fine (barcode is optional — see the model).
+        # When set, it must be unique within the branch. The DB constraint
+        # is the real guarantee; this check turns what would otherwise be
+        # an IntegrityError 500 into a clean 400 with a useful message.
+        value = (value or "").strip()
+        if not value:
+            return ""
+        request = self.context.get("request")
+        if request is None:
+            return value
+        clash = Product.all_objects.filter(
+            branch_id=request.branch_id, barcode=value, deleted_at__isnull=True
+        )
+        if self.instance is not None:
+            clash = clash.exclude(pk=self.instance.pk)
+        if clash.exists():
+            raise serializers.ValidationError(
+                f"Another product in this branch already uses barcode {value}."
+            )
+        return value
 
     def validate(self, attrs):
         bulk_price = attrs.get("bulk_price", getattr(self.instance, "bulk_price", None))
