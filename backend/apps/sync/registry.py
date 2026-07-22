@@ -58,6 +58,11 @@ NEVER_SYNCED = {
         "User accounts are HQ-owned and flow cloud -> branch via pull, "
         "never branch -> cloud (feasibility §6)."
     ),
+    "auth_users_businesssettings": (
+        "Business-wide policy is HQ-owned and pushed to branches read-only "
+        "(Phase 2 design §7.2), so it flows cloud -> branch via pull, never "
+        "branch -> cloud via outbox."
+    ),
     "inventory_producttemplate": (
         "Global static seed data, identical on every install and created "
         "by migration. Nothing to replicate."

@@ -1,11 +1,12 @@
 """
-URL patterns for this app are split into three lists because they mount
-under three different prefixes in the root URLconf (design doc Part E.1
+URL patterns for this app are split into four lists because they mount
+under four different prefixes in the root URLconf (design doc Part E.1
 and E.6 list these as separate route groups, not all under /auth/):
 
-    /api/v1/auth/...    -> auth_urlpatterns
-    /api/v1/setup/...   -> setup_urlpatterns
-    /api/v1/users/...   -> user_urlpatterns
+    /api/v1/auth/...      -> auth_urlpatterns
+    /api/v1/setup/...     -> setup_urlpatterns
+    /api/v1/users/...     -> user_urlpatterns
+    /api/v1/settings/...  -> settings_urlpatterns   (Phase 2 §7)
 
 See bledger/urls.py for how each is included.
 """
@@ -28,5 +29,12 @@ setup_urlpatterns = [
 ]
 
 user_urlpatterns = [
-    path("", views.StaffUserCreateView.as_view(), name="users"),
+    path("", views.StaffUserListCreateView.as_view(), name="users"),
+    path("<uuid:pk>/", views.StaffUserDetailView.as_view(), name="user-detail"),
+    path("<uuid:pk>/reset-pin/", views.StaffUserResetPinView.as_view(), name="user-reset-pin"),
+]
+
+settings_urlpatterns = [
+    path("business/", views.SettingsBusinessView.as_view(), name="settings-business"),
+    path("preferences/", views.BusinessSettingsView.as_view(), name="settings-preferences"),
 ]

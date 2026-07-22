@@ -114,6 +114,90 @@ class Branch(models.Model):
         return self.branch_name or self.business_name
 
 
+class BusinessSettings(models.Model):
+    """
+    Business-wide policy defaults — a single row per install (Phase 2
+    design §7.2). Deliberately kept separate from Branch: Branch is
+    *identity* (who and where this branch is), BusinessSettings is
+    *policy* (how the business chooses to operate). Once multi-branch is
+    live, policy is HQ-owned and pushed to branches read-only, while each
+    branch keeps its own identity — conflating the two onto Branch would
+    make that split impossible later.
+
+    Most fields here are consumed by workstreams not yet built (negotiated
+    pricing, customer credit, cost/margin alerts). They live here now,
+    with safe defaults, so those workstreams need no migration and no new
+    settings home when they land — the same "prepare the data model early"
+    approach SaleLineItem's variance fields already use.
+
+    Singleton: exactly one row, pk pinned to 1. Not a BaseModel — there's
+    nothing branch-scoped or soft-deletable about it, and it is never
+    branch->cloud replicated (see apps.sync.registry.NEVER_SYNCED).
+    """
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+
+    # --- Negotiated pricing defaults (workstream B, not yet built) ------
+    # Whole-percent bounds on how far a cashier may move a price from
+    # catalogue before manager approval is required. Business-wide
+    # fallback; per-product/per-category overrides come later (§3.1).
+    default_discount_floor_pct = models.PositiveIntegerField(
+        default=0,
+        help_text="Max discount %% a cashier may give without approval. 0 = no discount allowed by default.",
+    )
+    default_surplus_ceiling_pct = models.PositiveIntegerField(
+        default=0,
+        help_text="Max surplus %% a cashier may add without approval. 0 = no surplus allowed by default.",
+    )
+
+    # --- Multi-branch price-deviation alert (workstream A, §9.3) --------
+    price_deviation_alert_pct = models.PositiveIntegerField(
+        default=20,
+        help_text="HQ flags a branch price override deviating from catalogue by more than this %%.",
+    )
+
+    # --- Customer credit defaults (workstream C, not yet built) ---------
+    default_credit_limit = models.PositiveIntegerField(
+        default=0,
+        help_text="Default customer credit limit in XAF. 0 = credit off by default.",
+    )
+
+    # --- Cost/margin alerts (workstream G, not yet built) ---------------
+    margin_alert_pct = models.PositiveIntegerField(
+        default=15,
+        help_text="Flag a product whose average cost rose by more than this %% without a price change.",
+    )
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Business settings"
+        verbose_name_plural = "Business settings"
+
+    def __str__(self):
+        return "Business settings"
+
+    def save(self, *args, **kwargs):
+        # Pin every write to the single row — makes accidental creation of
+        # a second settings row impossible even via the ORM directly.
+        self.pk = 1
+        # A freshly-constructed instance (_state.adding) whose row already
+        # exists would otherwise issue a second INSERT and hit the pk
+        # UNIQUE constraint. Switch it to an UPDATE so it overwrites the
+        # singleton instead — the whole point of a singleton is that the
+        # last write wins on the one row, never errors.
+        if self._state.adding and type(self).objects.filter(pk=1).exists():
+            kwargs.pop("force_insert", None)
+            kwargs["force_update"] = True
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        """The one settings row, created with defaults on first access."""
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
 class BledgerUserManager(BaseUserManager):
     use_in_migrations = True
 

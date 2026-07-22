@@ -6,7 +6,7 @@ from django.contrib.auth import authenticate
 from django.conf import settings
 from rest_framework import serializers
 
-from .models import BledgerUser, Branch, derive_branch_code
+from .models import BledgerUser, Branch, BusinessSettings, derive_branch_code
 
 
 class BranchSerializer(serializers.ModelSerializer):
@@ -145,6 +145,121 @@ class StaffUserCreateSerializer(serializers.ModelSerializer):
             pin=pin or None,
             name=validated_data["name"],
         )
+
+
+class BranchUpdateSerializer(serializers.ModelSerializer):
+    """
+    PATCH /api/v1/settings/business/ — the editable slice of Branch
+    (Phase 2 design §7.2). Only the descriptive business fields are
+    writable; identity and system fields (code, deployment_mode,
+    setup_complete, id, timestamps) stay read-only. In particular `code`
+    is immutable after setup because it is baked into every existing
+    sale reference — changing it would orphan historical references from
+    their branch.
+    """
+
+    class Meta:
+        model = Branch
+        fields = [
+            "id",
+            "business_name",
+            "branch_name",
+            "code",
+            "address",
+            "phone",
+            "receipt_footer",
+            "deployment_mode",
+            "setup_complete",
+        ]
+        read_only_fields = ["id", "code", "deployment_mode", "setup_complete"]
+
+    def validate_business_name(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Business name can't be blank.")
+        return value
+
+
+class BusinessSettingsSerializer(serializers.ModelSerializer):
+    """
+    GET/PATCH /api/v1/settings/preferences/ — business-wide policy
+    defaults (Phase 2 design §7.2). Every field is a plain configurable
+    value with a safe default; the features that consume them
+    (negotiated pricing, credit, margin alerts) are not built yet.
+    """
+
+    class Meta:
+        model = BusinessSettings
+        fields = [
+            "default_discount_floor_pct",
+            "default_surplus_ceiling_pct",
+            "price_deviation_alert_pct",
+            "default_credit_limit",
+            "margin_alert_pct",
+            "updated_at",
+        ]
+        read_only_fields = ["updated_at"]
+
+    def validate_default_discount_floor_pct(self, value):
+        if value > 100:
+            raise serializers.ValidationError("Discount can't exceed 100%.")
+        return value
+
+
+class StaffUserListSerializer(serializers.ModelSerializer):
+    """
+    GET /api/v1/users/ — staff directory (Phase 2 design §7.1). Read-only
+    projection: never exposes password or pin_hash, only whether a PIN is
+    set (has_pin).
+    """
+
+    class Meta:
+        model = BledgerUser
+        fields = ["id", "name", "username", "role", "is_active", "has_pin", "created_at"]
+        read_only_fields = fields
+
+
+class StaffUserUpdateSerializer(serializers.ModelSerializer):
+    """
+    PATCH /api/v1/users/{id}/ — edit a staff member's display name, role,
+    or active status (Phase 2 design §7.1). Username is immutable (it is
+    the login identifier and appears in audit context); credentials are
+    changed through their own dedicated flows, not here.
+
+    Lockout guards live in the view, which has request.user; a serializer
+    validating identity-of-caller would be reaching outside its remit.
+    """
+
+    class Meta:
+        model = BledgerUser
+        fields = ["id", "name", "username", "role", "is_active", "has_pin", "created_at"]
+        read_only_fields = ["id", "username", "has_pin", "created_at"]
+
+    def validate_role(self, value):
+        # Owner is established at setup and is not assignable through staff
+        # editing — promoting a second owner is a distinct, deliberate act
+        # (ownership transfer), not a routine role change, and isn't a
+        # Phase 2 requirement. Demoting the owner is blocked in the view.
+        if value == BledgerUser.ROLE_OWNER:
+            raise serializers.ValidationError(
+                "Can't assign the owner role here. Owners are set at business setup."
+            )
+        return value
+
+
+class ResetPinSerializer(serializers.Serializer):
+    """
+    POST /api/v1/users/{id}/reset-pin/ — owner sets a new 4-digit PIN for
+    a staff member (Phase 2 design §7.1). Separate from the edit endpoint
+    because it writes a credential, not a profile field, and so warrants
+    its own explicit action rather than riding along in a general PATCH.
+    """
+
+    pin = serializers.CharField(min_length=4, max_length=4)
+
+    def validate_pin(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError("PIN must be exactly 4 digits.")
+        return value
 
 
 class SetupSerializer(serializers.Serializer):

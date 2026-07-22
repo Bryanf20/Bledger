@@ -1,13 +1,24 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import BledgerUser, Branch
+from .models import BledgerUser, Branch, BusinessSettings
 
 
 @admin.register(Branch)
 class BranchAdmin(admin.ModelAdmin):
-    list_display = ("business_name", "branch_name", "deployment_mode", "setup_complete")
-    search_fields = ("business_name", "branch_name")
+    list_display = ("business_name", "branch_name", "code", "deployment_mode", "setup_complete")
+    search_fields = ("business_name", "branch_name", "code")
+
+
+@admin.register(BusinessSettings)
+class BusinessSettingsAdmin(admin.ModelAdmin):
+    # Singleton — hide "add" once the one row exists, and never allow
+    # deleting it (the app expects it to be loadable at all times).
+    def has_add_permission(self, request):
+        return not BusinessSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(BledgerUser)

@@ -332,6 +332,17 @@ Staff management partially exists: `POST /api/v1/users/` creates staff, but ther
 
 New business-wide defaults (pricing bounds, credit defaults) need somewhere to live. Recommend a small singleton `BusinessSettings` model rather than scattering fields onto `Branch` — it keeps branch identity separate from business policy, which matters once multiple branches exist and policy is HQ-owned.
 
+### 7.3 Implementation notes (Stage 1, step 2 — ✅ done)
+
+Backend core landed; the frontend Settings screen is a later step.
+
+- **`BusinessSettings`** (`apps/auth_users/models.py`) — singleton (pk pinned to 1, `save()` rewrites the one row rather than ever erroring on a second insert, `.load()` creates-with-defaults on first access). Not a `BaseModel` — nothing branch-scoped or soft-deletable about it. Fields carry the policy defaults later workstreams read: `default_discount_floor_pct` / `default_surplus_ceiling_pct` (B), `price_deviation_alert_pct` (A/§9.3), `default_credit_limit` (C), `margin_alert_pct` (G). All have safe defaults, so the features that consume them need no migration when they land. Added to `apps.sync.registry.NEVER_SYNCED` (HQ-owned policy flows cloud→branch via pull, never branch→cloud).
+- **Business config** — `GET/PATCH /api/v1/settings/business/` (owner-only) edits the caller's `Branch`. `code`, `deployment_mode`, and `setup_complete` are read-only; `code` in particular is immutable because it's baked into every existing sale reference (§8.1).
+- **Preferences** — `GET/PATCH /api/v1/settings/preferences/` (owner-only) edits the `BusinessSettings` singleton.
+- **Staff management** — `GET /api/v1/users/` (list, own branch only), `PATCH /api/v1/users/{id}/` (name/role/is_active; deactivate = `is_active=false`, users are never deleted), `POST /api/v1/users/{id}/reset-pin/`. Two lockout guards return 409: an owner can't deactivate or demote themselves. The owner role can't be assigned via staff editing (ownership transfer is a separate, deliberate act, not a Phase 2 requirement). All owner-only; all scoped to the caller's branch (cross-branch access returns 404).
+- **Branch and user edits do not write outbox entries** — both are in `NEVER_SYNCED`. In connected mode users are HQ-owned (pulled down), and branch-config sync direction is decided when Stage 3 lands. Deliberately out of scope here.
+- Tests: `apps/auth_users/tests/test_settings.py` (21). Full suite green except the pre-existing WeasyPrint-dependent printing tests.
+
 ---
 
 ## 7A. Workstream G — Cost tracking & profitability **[PROPOSED]**
@@ -506,7 +517,7 @@ Sequenced so each step is independently testable and leaves the system working.
 | # | Step | Delivers | Status |
 |---|---|---|---|
 | 1 | Schema fixes §8.1–8.4: branch-scoped reference, outbox backfill, payload contract + `schema_version`, HeldSale exclusion | Phase 1 data becomes sync-safe | ✅ **Done** |
-| 2 | Settings module core (§7) — business edit, staff management, `BusinessSettings` | Config becomes editable; gives later workstreams a home for their settings | Next |
+| 2 | Settings module core (§7) — business edit, staff management, `BusinessSettings` | Config becomes editable; gives later workstreams a home for their settings | ✅ **Done** |
 
 Step 2 sits here deliberately: pricing bounds (B) and credit defaults (C) both need somewhere to live, and editable business config is independently valuable today.
 
