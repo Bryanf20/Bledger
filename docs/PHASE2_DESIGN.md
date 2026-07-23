@@ -592,7 +592,7 @@ A single ledger with a direction reads like a real cashbook (money out = expense
 
 **Editability differs from sales/purchases deliberately.** A sale or purchase is a customer-/supplier-facing transaction and is immutable (corrections go through void / reversing entries). An expense is the owner's own bookkeeping, where a fat-fingered amount is common and harmless to fix — so expenses are editable and soft-deletable by the owner. This is a considered exception to the "financial records are immutable" convention, not an oversight.
 
-Roles: owner (and manager) record and view expenses; the net-profit P&L is owner-only; cashiers never see finances.
+Roles: owner (and manager) record and view expenses; the net-profit P&L was originally owner-only but is now **manager+** (superseded in step 8f — see §7C.4); cashiers never see finances.
 
 Sync: `ExpenseCategory` and `CashbookEntry` are branch-owned (each branch has its own rent and transport), so they sync branch→cloud like sales — registered `SYNCED`, outbox-written. No conflict with the §6 ownership model.
 
@@ -626,9 +626,11 @@ Two steps, both Stage 2:
 
 A batch of gaps raised after step 8b, hashed out before Stage 3 because two of them touch the schema and are far cheaper to land before the sync engine freezes table shapes. Decisions recorded here are the ones the owner chose when asked.
 
-### 7C.1 Activity log (§ step 8c) — ✅ **backend done**
+### 7C.1 Activity log (§ step 8c) — ✅ **done**
 
 A unified, append-only trail of the *major* things that happen in a branch, so an owner can answer "who did what, when" from one screen. **Sales are excluded** — they already have history + receipts, and logging every sale would drown the signal.
+
+**Sync classification — decided (pre-Stage-3): synced, with retention.** The log replicates to the cloud so an owner running several branches can audit any of them from HQ, but because it's high-volume and mostly low-value (every login is a row), it's the one synced table with a retention window: the Stage 3 sync worker prunes on-device rows older than `SYNC_RETENTION_DAYS["activity_activitylog"]` (default 365 days, declared in `apps/sync/registry.py`) to keep the local table and outbox bounded. The cloud keeps its own copy and ages out independently. A prune is an age-out, **not** a user delete, so it must not emit DELETE tombstones. Open sub-details for Stage 3: whether the prune runs as a periodic task or on the sync cycle, and whether the window later becomes a `BusinessSettings` field.
 
 **Decision — two visibility tiers:** managers see only the key operational events (`is_major=True`); **owners see everything**, including fine-grained owner-only detail. Cashiers have no access (audit sits above the till).
 
@@ -658,7 +660,7 @@ The **Settings** and **Staff management** backends already shipped in Stage 2, s
 
 > **Implemented.** `PnLView` relaxed to manager+ (finances test updated: manager 200, cashier 403). New `BrokeredSummaryView` (`/dashboard/brokered-summary/`, manager+; gain = Σ(actual_price − unit_cost_at_sale)×qty over brokered lines) + 3 tests. `ProfitCards.jsx` gains a highlighted **Net profit** headline card (red when negative), an **Expenses** card with the by-category breakdown (both from `usePnl`), and a **Brokered gains** card (`useBrokeredSummary`). Outstanding customer credit was already present on the dashboard. The Finances P&L panel also relaxed from owner-only to manager+ so there's no split.
 
-> **Reconciliation to confirm:** surfacing net profit on the dashboard is in slight tension with §7B.2's "P&L is owner-only." Since every other dashboard financial (gross margin, COGS, stock valuation) is already manager+, net profit and the expense widgets are made **manager+** for consistency, and the Finances P&L panel relaxes from owner-only to manager+ so there's no split. Owner-only can be restored on request.
+> **Reconciliation — confirmed (pre-Stage-3): manager+.** Surfacing net profit on the dashboard was in slight tension with §7B.2's original "P&L is owner-only." Resolved by making net profit and the expense widgets **manager+** for consistency with every other dashboard financial (gross margin, COGS, stock valuation), and relaxing the Finances P&L panel from owner-only to manager+ so there's no split. This supersedes the owner-only line in §7B.2.
 
 **Cashier expenses — decision: NO.** Item 4's "cashiers see only theirs" was resolved by keeping finances manager+ only (§7B.2 preserved); cashiers neither record nor see expenses, so the dashboard expense/net-profit widgets are simply manager+ with no per-cashier scoping.
 

@@ -48,6 +48,21 @@ SYNCED_TABLES = {
 }
 
 
+# Retention windows for synced tables that grow unbounded (Phase 2 design
+# §7C.1). Most synced tables are business records kept forever; the
+# activity log is the exception — it's high-volume, append-only, and
+# mostly low-value rows (every login), so it replicates to the cloud (an
+# owner with several branches can audit any of them from HQ) but the
+# Stage 3 sync worker prunes local rows older than this window to keep the
+# on-device table and outbox bounded. The cloud keeps its own copy (and
+# may apply its own, longer retention). Days; a table absent here is
+# retained indefinitely. A prune must NOT emit DELETE tombstones — these
+# are age-outs, not user deletions, and the cloud ages out independently.
+SYNC_RETENTION_DAYS = {
+    "activity_activitylog": 365,
+}
+
+
 NEVER_SYNCED = {
     "sales_heldsale": (
         "Transient by design — a held cart is hard-deleted on restore and "
