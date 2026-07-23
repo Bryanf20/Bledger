@@ -113,6 +113,38 @@
 .pos-brokered-gain.loss {
   color: var(--color-text-danger);
 }
+
+/* Negotiated per-line price editing (Phase 2 §3.2). */
+.pos-cart-price-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+.pos-cart-price-input {
+  width: 74px;
+  padding: 2px 6px;
+  font-size: 12px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+.pos-cart-price-unit {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+}
+.pos-cart-variance {
+  font-size: 10px;
+  font-weight: 600;
+}
+.pos-cart-variance.down {
+  color: var(--color-text-danger);
+}
+.pos-cart-variance.up {
+  color: var(--color-text-success);
+}
 .pos-held-btn {
   border-color: #ef9f27;
   color: var(--color-text-warning);

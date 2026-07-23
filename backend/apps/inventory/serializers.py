@@ -11,7 +11,7 @@ from rest_framework import serializers
 
 from apps.sync.models import OutboxEntry
 from apps.sync.utils import write_outbox_entry
- 
+
 from .models import (
     BranchPriceOverride,
     Category,
@@ -19,12 +19,19 @@ from .models import (
     ProductTemplate,
     StockAdjustment,
 )
+from .services import resolve_price_bounds
 
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ["id", "name", "description", "sort_order", "created_at", "updated_at"]
+        fields = [
+            "id", "name", "description", "sort_order",
+            # Negotiated-pricing bounds for this category (§3.1); null =
+            # inherit the business default.
+            "discount_floor_pct", "surplus_ceiling_pct",
+            "created_at", "updated_at",
+        ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
@@ -38,6 +45,11 @@ class ProductSerializer(serializers.ModelSerializer):
     # effective_bulk_price (design doc Part D / Feasibility Section 9.3).
     effective_retail_price = serializers.SerializerMethodField()
     effective_bulk_price = serializers.SerializerMethodField()
+    # Resolved negotiated-pricing bounds (§3.1) — product → category →
+    # business default — so the POS knows each product's allowed
+    # discount/surplus band without resolving it client-side.
+    effective_discount_floor_pct = serializers.SerializerMethodField()
+    effective_surplus_ceiling_pct = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -51,13 +63,34 @@ class ProductSerializer(serializers.ModelSerializer):
             # cost of opening stock or correct it; normally it's driven by
             # purchases. cost_is_set / last_cost are server-maintained.
             "average_cost", "cost_is_set", "last_cost",
+            # Per-product negotiated-pricing bounds (§3.1), writable; null
+            # = inherit category/business. Resolved values below.
+            "discount_floor_pct", "surplus_ceiling_pct",
             "effective_retail_price", "effective_bulk_price",
+            "effective_discount_floor_pct", "effective_surplus_ceiling_pct",
             "created_at", "updated_at",
         ]
         read_only_fields = [
             "id", "stock_level", "source", "cost_is_set", "last_cost",
             "created_at", "updated_at",
         ]
+
+    def _bounds(self, product):
+        # Load BusinessSettings once per serializer (not per product — a
+        # 1000-item POS list would otherwise re-query it every row), and
+        # cache the resolved pair per product so both method fields share.
+        if not hasattr(self, "_biz_settings"):
+            from apps.auth_users.models import BusinessSettings
+            self._biz_settings = BusinessSettings.load()
+        if not hasattr(product, "_resolved_bounds"):
+            product._resolved_bounds = resolve_price_bounds(product, settings_row=self._biz_settings)
+        return product._resolved_bounds
+
+    def get_effective_discount_floor_pct(self, product):
+        return self._bounds(product)[0]
+
+    def get_effective_surplus_ceiling_pct(self, product):
+        return self._bounds(product)[1]
 
     def validate_barcode(self, value):
         # Empty is always fine (barcode is optional — see the model).

@@ -190,6 +190,14 @@ New dashboard endpoints: total surplus per period, total discounts per period, n
 
 The per-cashier breakdown is the fraud-detection surface and should be prominent for owners. A cashier consistently discounting to the floor deserves a look.
 
+### 3.4a Implementation notes — negotiated pricing (Stage 2, step 6 — ✅ done)
+
+- **Bounds config** — `Category` and `Product` gained nullable `discount_floor_pct` / `surplus_ceiling_pct`; `BusinessSettings` already held the business defaults (step 2). `resolve_price_bounds(product)` (`inventory/services.py`) falls through product → category → default. Resolved values are exposed on `ProductSerializer` as `effective_discount_floor_pct` / `effective_surplus_ceiling_pct` (BusinessSettings loaded once per serializer to avoid an N+1 on the 1000-item POS list). Migration `inventory/0007_pricing_bounds`. **A bounds-editing UI isn't built** — bounds are set via the settings/preferences and product/category APIs; a settings screen for them is a follow-on.
+- **Server enforcement (the actual control)** — the sale line accepts `actual_price`; the server *always* resolves `catalogue_price` itself (never trusts the client), computes `variance = actual − catalogue`, and if any line breaches its band requires a valid `approval_token` (from `/auth/verify-pin/`, purpose `price_variance`). Missing/expired/tampered/wrong-purpose → the sale is rejected 400; on success the approver is recorded on the breaching lines' `variance_approved_by`. Within-band haggling needs nothing. `line_total` and subtotal use the negotiated price. Tested incl. the "catalogue price can't be spoofed" case and the strict 0/0 default.
+- **Composes with earlier steps** — brokered lines (5b) can now be negotiated too (variance is on the selling price; COGS is still the external cost). Default bounds are 0/0 (strict) until the owner loosens them.
+- **Reporting** — `GET /api/v1/dashboard/variance-summary/?period=` (manager+): total surplus, total discount, net, and the per-cashier breakdown (§3.4). End-of-day cash reconciliation is left to step 8's dashboard.
+- **Frontend** — each cart line has an editable unit price with a live variance and a "needs approval" hint (client bounds are UX only). On confirm, if the server asks for approval the POS opens an `ApprovalPrompt` (manager username + PIN → `verifyPin`) and retries with the token — so the gate is always the server, even if client bounds are stale. Price editing preserved across quantity changes; hold/restore carries negotiated prices. esbuild-validated, not `npm run build`-tested.
+
 ### 3.5 Implementation notes — PIN-approval primitive (Stage 2, step 4 — ✅ done)
 
 The approval *mechanism* (§3.2) is built ahead of the pricing UI (§3.1) and credit (§4) that consume it, since both need the same primitive. What landed:
@@ -658,7 +666,7 @@ These ship without any cloud, so they reach real users fast and de-risk the sche
 | 4 | PIN-approval primitive — `/auth/verify-pin/` with rate limiting (§3.2) | Shared by haggling and credit — ✅ **done** |
 | 5 | **Cost tracking (§7A)** — snapshot fixes, `ProductPriceHistory`, WAC on `Product`, COGS on sale lines, migration backfill | Profit becomes computable at all — ✅ **done** |
 | 5b | **Brokered sales (§7B.1)** — `SaleLineItem.is_brokered`/`source_note`, no-stock sale path, external cost as COGS | Captures the neighbour-sourcing gain; small, extends step 5 — ✅ **done** |
-| 6 | Negotiated pricing (§3) — bounds config, POS price editing, server enforcement, variance reporting | The culturally-critical feature |
+| 6 | Negotiated pricing (§3) — bounds config, POS price editing, server enforcement, variance reporting | The culturally-critical feature — ✅ **done** |
 | 7 | Customer accounts & credit (§4) — models, POS integration, Customers screen, aged-debt report | Removes a real blind spot in daily cash |
 | 8 | Margin & valuation reporting (§7A.6) — margin dashboard, stock valuation, margin-squeeze alerts | The owner-facing payoff of step 5 |
 | 8b | **Finances & cashbook (§7B.2–7B.3)** — `ExpenseCategory`/`CashbookEntry`, Finances screen, net-profit P&L | Gross margin becomes *net* profit; pairs with step 8 |

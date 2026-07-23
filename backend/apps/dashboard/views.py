@@ -1,4 +1,4 @@
-from django.db.models import Count, F, IntegerField, Sum, Value
+from django.db.models import Count, F, IntegerField, Q, Sum, Value
 from django.db.models.functions import Coalesce, TruncDay, TruncHour
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -145,6 +145,76 @@ class PaymentBreakdownView(APIView):
             .order_by("-revenue")
         )
         return Response(PaymentBreakdownSerializer(rows, many=True).data)
+
+
+class VarianceSummaryView(APIView):
+    """GET /api/v1/dashboard/variance-summary/?period=today|week|month
+
+    Negotiated-pricing outcomes (Phase 2 design §3.4): total surplus
+    collected (haggled above catalogue), total discount given (below),
+    the net, and a per-cashier breakdown — the fraud-detection surface,
+    so an owner can see who consistently discounts. Manager+ only.
+
+    Amounts are line-level: per-unit `variance` × quantity, over
+    completed (non-voided) sales in the period. Brokered lines are
+    included — a negotiated price on a sourced item is still surplus or
+    discount on the selling price."""
+
+    permission_classes = [IsManagerOrOwner]
+
+    def get(self, request):
+        period = resolve_period(request.query_params.get("period"))
+        start, end = period_range(period)
+        lines = SaleLineItem.objects.filter(sale__in=_branch_sales(request, start, end))
+
+        line_amount = F("variance") * F("quantity")
+        totals = lines.aggregate(
+            surplus=Coalesce(
+                Sum(line_amount, filter=Q(variance__gt=0)), Value(0, output_field=IntegerField())
+            ),
+            # Discount comes out negative (variance < 0); flip to a
+            # positive "revenue foregone" figure below.
+            discount=Coalesce(
+                Sum(line_amount, filter=Q(variance__lt=0)), Value(0, output_field=IntegerField())
+            ),
+        )
+        total_surplus = totals["surplus"]
+        total_discount = -totals["discount"]
+
+        per_cashier = [
+            {
+                "cashier_id": row["sale__cashier"],
+                "cashier_name": row["sale__cashier__name"],
+                "surplus": row["surplus"],
+                "discount": -row["discount"],
+                "net": row["surplus"] + row["discount"],
+            }
+            for row in (
+                lines.exclude(variance=0)
+                .values("sale__cashier", "sale__cashier__name")
+                .annotate(
+                    surplus=Coalesce(
+                        Sum(line_amount, filter=Q(variance__gt=0)),
+                        Value(0, output_field=IntegerField()),
+                    ),
+                    discount=Coalesce(
+                        Sum(line_amount, filter=Q(variance__lt=0)),
+                        Value(0, output_field=IntegerField()),
+                    ),
+                )
+                .order_by("sale__cashier__name")
+            )
+        ]
+
+        return Response(
+            {
+                "period": period,
+                "total_surplus": total_surplus,
+                "total_discount": total_discount,
+                "net_variance": total_surplus - total_discount,
+                "per_cashier": per_cashier,
+            }
+        )
 
 
 class SalesChartView(APIView):

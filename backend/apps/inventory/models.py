@@ -59,6 +59,13 @@ class Category(BaseModel):
     description = models.CharField(max_length=255, blank=True, default="")
     sort_order = models.PositiveIntegerField(default=0)
 
+    # Negotiated-pricing bounds for products in this category (Phase 2
+    # design §3.1), as whole percents. Null = "not set at this level";
+    # resolution falls through to the business-wide default in
+    # BusinessSettings. A product may override its category (below).
+    discount_floor_pct = models.PositiveIntegerField(null=True, blank=True)
+    surplus_ceiling_pct = models.PositiveIntegerField(null=True, blank=True)
+
     class Meta:
         ordering = ["sort_order", "name"]
         constraints = [
@@ -122,6 +129,13 @@ class Product(BaseModel):
     # Most recent purchase unit cost, for "your cost went up" comparisons
     # (§7A.6). Null until the first purchase or backfill.
     last_cost = models.PositiveIntegerField(null=True, blank=True)
+
+    # Per-product negotiated-pricing bounds (Phase 2 design §3.1), whole
+    # percents. Null = fall through to this product's category, then to
+    # the business default. Set here to override the category for a
+    # specific product (e.g. a loss-leader you never discount).
+    discount_floor_pct = models.PositiveIntegerField(null=True, blank=True)
+    surplus_ceiling_pct = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ["name"]

@@ -3,14 +3,20 @@ from django.db.models import F
 from django.utils import timezone
 from rest_framework import serializers
 
+from apps.auth_users.approvals import (
+    PURPOSE_PRICE_VARIANCE,
+    ApprovalError,
+    verify_approval_token,
+)
+from apps.auth_users.models import BledgerUser
 from apps.core.utils.xaf import round_xaf
 from apps.inventory.models import Product
-from apps.inventory.services import weighted_average_cost
+from apps.inventory.services import resolve_price_bounds, weighted_average_cost
 from apps.sync.models import OutboxEntry
 from apps.sync.utils import write_outbox_entry
 
 from .models import HeldSale, Sale, SaleLineItem
-from .services import resolve_unit_price
+from .services import price_needs_approval, resolve_unit_price
 
 
 class SaleLineItemSerializer(serializers.ModelSerializer):
@@ -43,6 +49,11 @@ class SaleLineItemInputSerializer(serializers.Serializer):
 
     product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
     quantity = serializers.IntegerField(min_value=1)
+    # Negotiated selling price per unit (§3.2). Optional — omit for a
+    # normal sale at the catalogue/branch price. When it differs from the
+    # resolved catalogue price by more than the allowed band, the sale
+    # needs a manager approval token (see SaleSerializer).
+    actual_price = serializers.IntegerField(min_value=0, required=False)
     # Brokered line (§7B.1): sourced externally, moves no stock. When set,
     # external_cost (what was paid the outside source) is required and is
     # recorded as the line's cost-of-goods-sold.
@@ -64,6 +75,11 @@ class SaleSerializer(serializers.ModelSerializer):
     line_items = SaleLineItemSerializer(many=True, read_only=True)
     items = SaleLineItemInputSerializer(many=True, write_only=True)
     cashier_name = serializers.CharField(source="cashier.name", read_only=True)
+    # A one-shot manager-approval token (from POST /auth/verify-pin/ with
+    # purpose "price_variance") authorising any lines whose negotiated
+    # price falls outside the allowed band (§3.2). Absent for a normal
+    # sale; required the moment any line breaches its bounds.
+    approval_token = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = Sale
@@ -71,7 +87,8 @@ class SaleSerializer(serializers.ModelSerializer):
             "id", "reference", "cashier", "cashier_name", "payment_method",
             "momo_reference", "momo_confirmed", "subtotal", "tax_amount",
             "total_amount", "amount_tendered", "status", "voided_by",
-            "void_reason", "voided_at", "line_items", "items", "created_at",
+            "void_reason", "voided_at", "line_items", "items", "approval_token",
+            "created_at",
         ]
         read_only_fields = [
             "id", "reference", "cashier", "cashier_name", "subtotal",
@@ -96,6 +113,9 @@ class SaleSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         items_data = validated_data.pop("items")
+        # Popped here so it isn't forwarded into Sale.objects.create() —
+        # it's an authorisation input, not a Sale field.
+        approval_token = validated_data.pop("approval_token", "")
         # Sale.reference is unique at the DB level — two concurrent
         # writers can compute the same "next" reference, in which case
         # the loser's INSERT raises IntegrityError and the attempt is
@@ -104,7 +124,7 @@ class SaleSerializer(serializers.ModelSerializer):
         # IntegrityError poisons the open transaction.
         for attempt in range(5):
             try:
-                return self._create_once(validated_data, items_data)
+                return self._create_once(validated_data, items_data, approval_token)
             except IntegrityError:
                 if attempt == 4:
                     raise
@@ -140,7 +160,7 @@ class SaleSerializer(serializers.ModelSerializer):
         last_seq = int(last.rsplit("-", 1)[1]) if last else 0
         return f"{prefix}{last_seq + 1:04d}"
 
-    def _create_once(self, validated_data, items_data):
+    def _create_once(self, validated_data, items_data, approval_token):
         request = self.context["request"]
         branch_id = request.branch_id
 
@@ -172,14 +192,33 @@ class SaleSerializer(serializers.ModelSerializer):
                             }
                         )
 
-                unit_price = resolve_unit_price(product, branch_id, quantity)
-                line_total = round_xaf(unit_price * quantity)
+                # Catalogue price is ALWAYS resolved server-side and never
+                # trusted from the client (§3.3). actual_price is the
+                # cashier's negotiated price; absent means "at catalogue".
+                catalogue_price = resolve_unit_price(product, branch_id, quantity)
+                actual_price = item.get("actual_price")
+                if actual_price is None:
+                    actual_price = catalogue_price
+                variance = actual_price - catalogue_price
+
+                # A price outside the product's allowed band needs a
+                # manager's approval (§3.2). Bounds resolve product →
+                # category → business default.
+                floor_pct, ceiling_pct = resolve_price_bounds(product)
+                needs_approval = price_needs_approval(
+                    catalogue_price, actual_price, floor_pct, ceiling_pct
+                )
+
+                line_total = round_xaf(actual_price * quantity)
 
                 line_items_payload.append(
                     {
                         "product": product,
                         "quantity": quantity,
-                        "unit_price": unit_price,
+                        "catalogue_price": catalogue_price,
+                        "actual_price": actual_price,
+                        "variance": variance,
+                        "needs_approval": needs_approval,
                         "line_total": line_total,
                         "is_brokered": is_brokered,
                         "external_cost": item.get("external_cost", 0),
@@ -187,6 +226,24 @@ class SaleSerializer(serializers.ModelSerializer):
                     }
                 )
                 subtotal += line_total
+
+            # If any line breached its bounds, the whole sale needs a valid
+            # manager approval token (§3.3 step 5). Without it — or with an
+            # expired/tampered/wrong-purpose one — the sale is rejected.
+            # This is the actual control; client-side bounds are only UX.
+            approver = None
+            if any(p["needs_approval"] for p in line_items_payload):
+                try:
+                    approver_id = verify_approval_token(
+                        approval_token, purpose=PURPOSE_PRICE_VARIANCE
+                    )
+                except ApprovalError as exc:
+                    raise serializers.ValidationError({"approval_token": str(exc)})
+                approver = BledgerUser.objects.filter(pk=approver_id, is_active=True).first()
+                if approver is None:
+                    raise serializers.ValidationError(
+                        {"approval_token": "The approving manager could not be found."}
+                    )
 
             tax_amount = 0  # no tax in Phase 1 — receipt shows "Tax (0%)"
             total_amount = subtotal + tax_amount
@@ -223,9 +280,13 @@ class SaleSerializer(serializers.ModelSerializer):
                     # (0 when never set — reporting treats that as unknown).
                     product_name=product.name,
                     quantity=payload["quantity"],
-                    catalogue_price=payload["unit_price"],
-                    actual_price=payload["unit_price"],
-                    variance=0,
+                    catalogue_price=payload["catalogue_price"],
+                    actual_price=payload["actual_price"],
+                    variance=payload["variance"],
+                    # The approver is recorded only on the lines that
+                    # actually breached their bounds (§3.3); within-bounds
+                    # haggling is free and needs no approver.
+                    variance_approved_by=(approver if payload["needs_approval"] else None),
                     unit_cost_at_sale=(
                         payload["external_cost"] if is_brokered else product.average_cost
                     ),

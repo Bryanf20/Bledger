@@ -11,6 +11,27 @@ bulk_min_qty_override interacts with retail vs bulk selection), fix
 here, not there.
 """
 from apps.inventory.models import BranchPriceOverride, Product
+from apps.inventory.services import resolve_price_bounds  # re-exported for callers  # noqa: F401
+
+
+def price_needs_approval(catalogue_price: int, actual_price: int, floor_pct: int, ceiling_pct: int) -> bool:
+    """
+    True when `actual_price` falls outside the allowed band around
+    `catalogue_price` (§3.2), i.e. a discount deeper than floor_pct or a
+    surplus higher than ceiling_pct — the cases that need a manager PIN.
+
+    Uses integer XAF thresholds (round the percentage of catalogue). At
+    catalogue price exactly, or anywhere inside the band, no approval.
+    """
+    if actual_price < catalogue_price:
+        # Discount: how far below catalogue is allowed.
+        min_allowed = catalogue_price - (catalogue_price * floor_pct) // 100
+        return actual_price < min_allowed
+    if actual_price > catalogue_price:
+        # Surplus: how far above catalogue is allowed.
+        max_allowed = catalogue_price + (catalogue_price * ceiling_pct) // 100
+        return actual_price > max_allowed
+    return False
 
 
 def resolve_unit_price(product: Product, branch_id: str, quantity: int) -> int:

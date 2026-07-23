@@ -17,6 +17,7 @@ import Cart from "./Cart";
 import PaymentPanel from "./PaymentPanel";
 import HeldSalesDrawer from "./HeldSalesDrawer";
 import BrokeredItemForm from "./BrokeredItemForm";
+import ApprovalPrompt from "./ApprovalPrompt";
 import "./POSScreen.css";
 
 export default function POSScreen() {
@@ -63,6 +64,10 @@ export default function POSScreen() {
   // (Phase 2 §7B.1); null when the brokered form is closed.
   const [brokeredProduct, setBrokeredProduct] = useState(null);
 
+  // True when the sale is waiting on a manager's price-variance approval
+  // (Phase 2 §3.2) — shows the ApprovalPrompt over the right panel.
+  const [needsApproval, setNeedsApproval] = useState(false);
+
   const productsById = useMemo(() => new Map((products ?? []).map((p) => [p.id, p])), [products]);
 
   // Barcode -> product lookup, client-side (same "fetch all, resolve
@@ -105,7 +110,8 @@ export default function POSScreen() {
   // can't fire behind the held-sales drawer or a hold/clear confirm.
   useBarcodeInput({
     onScan: handleScan,
-    enabled: scanEnabled && !showHeldDrawer && action === null && brokeredProduct === null,
+    enabled:
+      scanEnabled && !showHeldDrawer && action === null && brokeredProduct === null && !needsApproval,
   });
 
   const categories = useMemo(() => {
@@ -138,29 +144,42 @@ export default function POSScreen() {
     setHoldLabel("");
   }
 
-  async function handleConfirmSale() {
+  function saleItemPayload(i) {
+    // actual_price is sent for every line (equals catalogue when not
+    // negotiated) so the server always has it; brokered lines add their
+    // external-source fields.
+    const base = { product: i.productId, quantity: i.quantity, actual_price: i.actualPrice };
+    return i.isBrokered
+      ? { ...base, is_brokered: true, external_cost: i.externalCost, source_note: i.sourceNote }
+      : base;
+  }
+
+  async function submitSale(approvalToken) {
+    const sale = await createSaleMutation.mutateAsync({
+      payment_method: paymentMethod,
+      ...(isMomo ? { momo_reference: momoReference.trim(), momo_confirmed: momoConfirmed } : {}),
+      ...(approvalToken ? { approval_token: approvalToken } : {}),
+      items: items.map(saleItemPayload),
+    });
+    clear();
+    resetPaymentState();
+    navigate(`/receipt/${sale.id}`);
+  }
+
+  async function handleConfirmSale(approvalToken = null) {
     try {
-      const sale = await createSaleMutation.mutateAsync({
-        payment_method: paymentMethod,
-        ...(isMomo ? { momo_reference: momoReference.trim(), momo_confirmed: momoConfirmed } : {}),
-        items: items.map((i) =>
-          i.isBrokered
-            ? {
-                product: i.productId,
-                quantity: i.quantity,
-                is_brokered: true,
-                external_cost: i.externalCost,
-                source_note: i.sourceNote,
-              }
-            : { product: i.productId, quantity: i.quantity },
-        ),
-      });
-      clear();
-      resetPaymentState();
-      navigate(`/receipt/${sale.id}`);
+      await submitSale(approvalToken);
     } catch (err) {
+      // The server is the authority on whether a negotiated price needs
+      // approval — if it asks for a token, open the manager prompt and
+      // retry once approved.
+      if (err.response?.data?.approval_token && !approvalToken) {
+        setNeedsApproval(true);
+        return;
+      }
       const detail =
         err.response?.data?.items?.[0] ||
+        err.response?.data?.approval_token ||
         err.response?.data?.detail ||
         "Could not complete the sale. Check stock and try again.";
       showToast("error", detail);
@@ -361,7 +380,7 @@ export default function POSScreen() {
                 type="button"
                 className="pos-confirm-btn"
                 disabled={!canConfirm || createSaleMutation.isPending}
-                onClick={handleConfirmSale}
+                onClick={() => handleConfirmSale()}
               >
                 {createSaleMutation.isPending ? "Completing…" : "Confirm sale"}
               </button>
@@ -409,6 +428,21 @@ export default function POSScreen() {
                 onConfirm={({ quantity, externalCost, sourceNote }) => {
                   addBrokeredItem(brokeredProduct, { quantity, externalCost, sourceNote });
                   setBrokeredProduct(null);
+                }}
+              />
+            )}
+
+            {/* Manager PIN approval for a negotiated price beyond bounds
+                (§3.2). On approval, retry the sale with the token. */}
+            {needsApproval && (
+              <ApprovalPrompt
+                purpose="price_variance"
+                title="Price approval needed"
+                subtitle="A line is priced beyond the allowed range. A manager must approve."
+                onCancel={() => setNeedsApproval(false)}
+                onApproved={(token) => {
+                  setNeedsApproval(false);
+                  handleConfirmSale(token);
                 }}
               />
             )}

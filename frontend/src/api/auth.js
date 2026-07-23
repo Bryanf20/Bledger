@@ -36,3 +36,13 @@ export async function fetchSetupStatus() {
   const { data } = await apiClient.get("/setup/status/");
   return data; // { setup_complete }
 }
+
+// A manager authorises a cashier's action (a price beyond bounds, a
+// credit override) with their username + PIN (Phase 2 §3.2). Returns
+// { approved, approver, approval_token, purpose }. The approval_token is
+// short-lived (~2 min) and scoped to `purpose`; attach it to the request
+// that needed approval. Does NOT change who's logged in.
+export async function verifyPin({ username, pin, purpose }) {
+  const { data } = await apiClient.post("/auth/verify-pin/", { username, pin, purpose });
+  return data;
+}

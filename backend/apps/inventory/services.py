@@ -42,6 +42,51 @@ def weighted_average_cost(current_stock, current_avg, incoming_qty, incoming_cos
     total_qty = current_stock + incoming_qty
     return round_xaf(total_value / total_qty)
 
+
+def resolve_price_bounds(product, settings_row=None):
+    """
+    The negotiated-pricing bounds (discount_floor_pct, surplus_ceiling_pct)
+    that apply to `product`, as whole percents (Phase 2 design §3.1).
+
+    Resolution falls through, most specific first:
+        product → its category → business-wide default (BusinessSettings).
+
+    A floor of 10 means a cashier may discount up to 10%% below the
+    catalogue price without approval; a ceiling of 20 means up to 20%%
+    above. The business default is 0/0 (any variance needs approval)
+    until the owner sets looser bounds in settings.
+
+    Pass `settings_row` to reuse an already-loaded BusinessSettings when
+    resolving bounds for many products (e.g. the POS product list), so it
+    isn't reloaded per product.
+    """
+    # Imported inside the function: BusinessSettings lives in auth_users,
+    # and importing it at module load would couple inventory's import
+    # graph to auth_users unnecessarily.
+    if settings_row is None:
+        from apps.auth_users.models import BusinessSettings
+        settings_row = BusinessSettings.load()
+
+    def _resolve(product_val, category_val, default_val):
+        if product_val is not None:
+            return product_val
+        if category_val is not None:
+            return category_val
+        return default_val
+
+    category = product.category
+    floor = _resolve(
+        product.discount_floor_pct,
+        category.discount_floor_pct if category else None,
+        settings_row.default_discount_floor_pct,
+    )
+    ceiling = _resolve(
+        product.surplus_ceiling_pct,
+        category.surplus_ceiling_pct if category else None,
+        settings_row.default_surplus_ceiling_pct,
+    )
+    return floor, ceiling
+
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
 

@@ -3,6 +3,7 @@ import { useCartStore } from "../../store/cartStore";
 export default function Cart({ productsById }) {
   const items = useCartStore((s) => s.items);
   const setQuantity = useCartStore((s) => s.setQuantity);
+  const setLinePrice = useCartStore((s) => s.setLinePrice);
   const removeItem = useCartStore((s) => s.removeItem);
 
   return (
@@ -25,6 +26,26 @@ export default function Cart({ productsById }) {
                 {item.name}
                 {item.bulkApplied && <span className="pos-prod-bulk"> · bulk</span>}
                 {item.isBrokered && <span className="pos-brokered-tag"> · sourced</span>}
+                {/* Negotiated price (§3.2): editable unit price, with a
+                    live variance and an approval marker when out of band. */}
+                <div className="pos-cart-price-edit">
+                  <input
+                    type="number"
+                    min="0"
+                    className="pos-cart-price-input"
+                    aria-label={`Unit price for ${item.name}`}
+                    value={item.actualPrice}
+                    onChange={(e) => setLinePrice(item.productId, e.target.value, product)}
+                  />
+                  <span className="pos-cart-price-unit">/ unit</span>
+                  {item.variance !== 0 && (
+                    <span className={`pos-cart-variance${item.variance < 0 ? " down" : " up"}`}>
+                      {item.variance < 0 ? "▼" : "▲"}
+                      {new Intl.NumberFormat("en-US").format(Math.abs(item.variance))}
+                      {item.needsApproval && " · needs approval"}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="pos-qty-ctrl">
                 <button

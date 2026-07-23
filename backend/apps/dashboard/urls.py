@@ -7,6 +7,7 @@ from .views import (
     SalesSummaryView,
     StockAlertView,
     TopProductsView,
+    VarianceSummaryView,
 )
 
 # No ViewSets/DefaultRouter in this app — every endpoint is a function-style
@@ -20,6 +21,7 @@ urlpatterns = [
     path("dashboard/top-products/", TopProductsView.as_view(), name="dashboard-top-products"),
     path("dashboard/payment-breakdown/", PaymentBreakdownView.as_view(), name="dashboard-payment-breakdown"),
     path("dashboard/sales-chart/", SalesChartView.as_view(), name="dashboard-sales-chart"),
+    path("dashboard/variance-summary/", VarianceSummaryView.as_view(), name="dashboard-variance-summary"),
     path("dashboard/stock-alerts/", StockAlertView.as_view(), name="dashboard-stock-alerts"),
     path("reports/sales/", SalesReportView.as_view(), name="reports-sales"),
     path("reports/products/", ProductsReportView.as_view(), name="reports-products"),
