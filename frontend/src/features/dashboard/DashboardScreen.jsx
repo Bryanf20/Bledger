@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { hasRole } from "../../components/RoleGuard";
+import { hasRole } from "../../components/roles";
 import Banner from "../../components/Banner";
 import ToastStack from "../../components/ToastStack";
 import ScreenTopbar from "../../components/ScreenTopbar";

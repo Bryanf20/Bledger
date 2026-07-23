@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { hasRole } from "../../components/RoleGuard";
+import { hasRole } from "../../components/roles";
 import InlineConfirm from "../../components/InlineConfirm";
 import ScreenTopbar from "../../components/ScreenTopbar";
 import ToastStack from "../../components/ToastStack";

@@ -1,18 +1,12 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { hasRole } from "./roles";
 
-// Role hierarchy matches the backend's IsOwner / IsManagerOrOwner /
-// IsCashierOrAbove permission classes (apps/core/permissions.py):
-// owner > manager > cashier. `allow` lists which roles may see the
-// wrapped content; anyone else is redirected (default: to `redirectTo`,
-// or rendered as `fallback` if provided instead of a redirect).
-const ROLE_RANK = { cashier: 0, manager: 1, owner: 2 };
-
-export function hasRole(userRole, minimumRole) {
-  if (!userRole || !(userRole in ROLE_RANK)) return false;
-  return ROLE_RANK[userRole] >= ROLE_RANK[minimumRole];
-}
-
+// `hasRole` + the role hierarchy live in ./roles so this file exports
+// only the RoleGuard component (react-refresh only-export-components).
+// `allow` lists which roles may see the wrapped content; anyone else is
+// redirected (default: to `redirectTo`, or rendered as `fallback` if
+// provided instead of a redirect).
 export default function RoleGuard({ allow, minimumRole, redirectTo = "/login", fallback = null, children }) {
   const { role, isAuthenticated } = useAuth();
 

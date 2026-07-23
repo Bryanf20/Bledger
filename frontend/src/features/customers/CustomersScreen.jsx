@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { hasRole } from "../../components/RoleGuard";
+import { hasRole } from "../../components/roles";
 import ScreenTopbar from "../../components/ScreenTopbar";
 import ToastStack from "../../components/ToastStack";
 import Banner from "../../components/Banner";

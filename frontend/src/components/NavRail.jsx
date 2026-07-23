@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { hasRole } from "./RoleGuard";
+import { hasRole } from "./roles";
 import "./NavRail.css";
 
 // Fixed-position rail, not a layout-wrapping component -- deliberately
