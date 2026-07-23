@@ -150,7 +150,7 @@
   background: var(--color-background-secondary);
   color: var(--color-text-secondary);
   padding: 8px;
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--border-radius-md);
   font-size: 13px;
   cursor: pointer;
 }
@@ -179,7 +179,7 @@
 .fin-field select {
   padding: 8px 10px;
   border: 0.5px solid var(--color-border-secondary);
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--border-radius-md);
   background: var(--color-background-primary);
   color: var(--color-text-primary);
   font-size: 14px;
@@ -189,8 +189,8 @@
   width: 100%;
   padding: 10px;
   border: none;
-  border-radius: var(--border-radius-sm);
-  background: var(--color-brand-primary, var(--color-text-primary));
+  border-radius: var(--border-radius-md);
+  background: var(--color-brand-primary, var(--color-brand-green));
   color: var(--color-text-inverse, #fff);
   font-size: 14px;
   font-weight: 600;
@@ -270,7 +270,7 @@
   background: var(--color-background-secondary);
   color: var(--color-text-secondary);
   padding: 4px 8px;
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--border-radius-md);
   font-size: 12px;
   cursor: pointer;
   margin-left: 4px;
