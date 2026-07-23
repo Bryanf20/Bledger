@@ -54,6 +54,7 @@ LOCAL_APPS = [
     "apps.sales",
     "apps.printing",
     "apps.suppliers",
+    "apps.customers",
     "apps.dashboard",
     "apps.sync",
 ]

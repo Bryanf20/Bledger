@@ -18,6 +18,7 @@ import PaymentPanel from "./PaymentPanel";
 import HeldSalesDrawer from "./HeldSalesDrawer";
 import BrokeredItemForm from "./BrokeredItemForm";
 import ApprovalPrompt from "./ApprovalPrompt";
+import CustomerPicker from "./CustomerPicker";
 import "./POSScreen.css";
 
 export default function POSScreen() {
@@ -64,9 +65,18 @@ export default function POSScreen() {
   // (Phase 2 §7B.1); null when the brokered form is closed.
   const [brokeredProduct, setBrokeredProduct] = useState(null);
 
-  // True when the sale is waiting on a manager's price-variance approval
-  // (Phase 2 §3.2) — shows the ApprovalPrompt over the right panel.
-  const [needsApproval, setNeedsApproval] = useState(false);
+  // Manager-approval state. `approvalKind` is "price" | "credit" | null
+  // (which prompt, if any, is open); `approvalTokens` accumulates tokens
+  // already obtained, so a sale needing BOTH a price and a credit
+  // approval keeps the first while getting the second (§3.2, §4.2).
+  const [approvalKind, setApprovalKind] = useState(null);
+  const [approvalTokens, setApprovalTokens] = useState({});
+
+  // Credit-sale state (§4): the chosen customer, the picker overlay, and
+  // any upfront cash paid at the till.
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [showCustomerPicker, setShowCustomerPicker] = useState(false);
+  const [upfront, setUpfront] = useState("");
 
   const productsById = useMemo(() => new Map((products ?? []).map((p) => [p.id, p])), [products]);
 
@@ -111,7 +121,12 @@ export default function POSScreen() {
   useBarcodeInput({
     onScan: handleScan,
     enabled:
-      scanEnabled && !showHeldDrawer && action === null && brokeredProduct === null && !needsApproval,
+      scanEnabled &&
+      !showHeldDrawer &&
+      action === null &&
+      brokeredProduct === null &&
+      approvalKind === null &&
+      !showCustomerPicker,
   });
 
   const categories = useMemo(() => {
@@ -131,12 +146,20 @@ export default function POSScreen() {
   }, [products, search, category]);
 
   const isMomo = paymentMethod === "mtn_momo" || paymentMethod === "orange_money";
-  const canConfirm = items.length > 0 && paymentMethod && (!isMomo || (momoReference.trim() && momoConfirmed));
+  const isCredit = paymentMethod === "credit";
+  const canConfirm =
+    items.length > 0 &&
+    paymentMethod &&
+    (!isMomo || (momoReference.trim() && momoConfirmed)) &&
+    (!isCredit || selectedCustomer);
 
   function resetPaymentState() {
     setPaymentMethod(null);
     setMomoReference("");
     setMomoConfirmed(false);
+    setSelectedCustomer(null);
+    setUpfront("");
+    setApprovalTokens({});
   }
 
   function closeAction() {
@@ -154,11 +177,15 @@ export default function POSScreen() {
       : base;
   }
 
-  async function submitSale(approvalToken) {
+  async function submitSale(tokens) {
     const sale = await createSaleMutation.mutateAsync({
       payment_method: paymentMethod,
       ...(isMomo ? { momo_reference: momoReference.trim(), momo_confirmed: momoConfirmed } : {}),
-      ...(approvalToken ? { approval_token: approvalToken } : {}),
+      ...(isCredit && selectedCustomer
+        ? { customer: selectedCustomer.id, amount_tendered: Number(upfront) || 0 }
+        : {}),
+      ...(tokens.approvalToken ? { approval_token: tokens.approvalToken } : {}),
+      ...(tokens.creditApprovalToken ? { credit_approval_token: tokens.creditApprovalToken } : {}),
       items: items.map(saleItemPayload),
     });
     clear();
@@ -166,21 +193,28 @@ export default function POSScreen() {
     navigate(`/receipt/${sale.id}`);
   }
 
-  async function handleConfirmSale(approvalToken = null) {
+  async function handleConfirmSale(tokens = approvalTokens) {
     try {
-      await submitSale(approvalToken);
+      await submitSale(tokens);
     } catch (err) {
-      // The server is the authority on whether a negotiated price needs
-      // approval — if it asks for a token, open the manager prompt and
-      // retry once approved.
-      if (err.response?.data?.approval_token && !approvalToken) {
-        setNeedsApproval(true);
+      // The server is the authority on which approvals a sale needs. It
+      // checks price variance first, then credit; ask for whichever it
+      // reports and retry, preserving any token already obtained.
+      const data = err.response?.data ?? {};
+      if (data.approval_token && !tokens.approvalToken) {
+        setApprovalKind("price");
+        return;
+      }
+      if (data.credit_approval_token && !tokens.creditApprovalToken) {
+        setApprovalKind("credit");
         return;
       }
       const detail =
-        err.response?.data?.items?.[0] ||
-        err.response?.data?.approval_token ||
-        err.response?.data?.detail ||
+        data.items?.[0] ||
+        data.customer ||
+        data.approval_token ||
+        data.credit_approval_token ||
+        data.detail ||
         "Could not complete the sale. Check stock and try again.";
       showToast("error", detail);
     }
@@ -355,6 +389,10 @@ export default function POSScreen() {
                 onMomoReferenceChange={setMomoReference}
                 momoConfirmed={momoConfirmed}
                 onMomoConfirmedChange={setMomoConfirmed}
+                customer={selectedCustomer}
+                onPickCustomer={() => setShowCustomerPicker(true)}
+                upfront={upfront}
+                onUpfrontChange={setUpfront}
               />
 
               <div className="pos-footer-actions">
@@ -432,17 +470,45 @@ export default function POSScreen() {
               />
             )}
 
-            {/* Manager PIN approval for a negotiated price beyond bounds
-                (§3.2). On approval, retry the sale with the token. */}
-            {needsApproval && (
+            {/* Manager PIN approval — price variance (§3.2) or credit
+                over-limit (§4.2). Tokens accumulate so a sale needing
+                both is handled in two prompts. */}
+            {approvalKind === "price" && (
               <ApprovalPrompt
                 purpose="price_variance"
                 title="Price approval needed"
                 subtitle="A line is priced beyond the allowed range. A manager must approve."
-                onCancel={() => setNeedsApproval(false)}
+                onCancel={() => setApprovalKind(null)}
                 onApproved={(token) => {
-                  setNeedsApproval(false);
-                  handleConfirmSale(token);
+                  const next = { ...approvalTokens, approvalToken: token };
+                  setApprovalTokens(next);
+                  setApprovalKind(null);
+                  handleConfirmSale(next);
+                }}
+              />
+            )}
+
+            {approvalKind === "credit" && (
+              <ApprovalPrompt
+                purpose="credit_override"
+                title="Credit approval needed"
+                subtitle="This sale puts the customer over their credit limit. A manager must approve."
+                onCancel={() => setApprovalKind(null)}
+                onApproved={(token) => {
+                  const next = { ...approvalTokens, creditApprovalToken: token };
+                  setApprovalTokens(next);
+                  setApprovalKind(null);
+                  handleConfirmSale(next);
+                }}
+              />
+            )}
+
+            {showCustomerPicker && (
+              <CustomerPicker
+                onCancel={() => setShowCustomerPicker(false)}
+                onPick={(c) => {
+                  setSelectedCustomer(c);
+                  setShowCustomerPicker(false);
                 }}
               />
             )}

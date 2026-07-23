@@ -1,0 +1,244 @@
+/* Customers & credit screen (Phase 2 §4). Master-detail, mirroring the
+   Suppliers screen's layout but with its own cust- prefix. Belt-and-
+   braces local height chain, same insurance the other screens keep in
+   case screen-layout.css isn't applied. */
+.cust-page {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  background: var(--color-background-secondary);
+  padding-top: 10px;
+}
+.cust-screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-background-primary);
+}
+.cust-body {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Left: customer directory */
+.cust-list-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 0.5px solid var(--color-border-tertiary);
+}
+.cust-list-header {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.cust-search {
+  width: 100%;
+  padding: 7px 10px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  font-size: 12px;
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+.cust-list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.cust-empty {
+  padding: 16px 14px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+.cust-item {
+  padding: 12px 14px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  cursor: pointer;
+}
+.cust-item:hover {
+  background: var(--color-background-secondary);
+}
+.cust-item.active {
+  background: var(--color-background-success);
+  border-right: 2px solid var(--color-brand-green);
+}
+.cust-item-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.cust-item-meta {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+.cust-list-footer {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-top: 0.5px solid var(--color-border-tertiary);
+}
+.cust-add-btn {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px dashed var(--color-border-secondary);
+  background: var(--color-background-primary);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cust-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cust-add-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+/* Right: detail */
+.cust-detail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.cust-detail-header {
+  flex-shrink: 0;
+  padding: 16px 20px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.cust-detail-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.cust-detail-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+.cust-stats {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.cust-stat {
+  padding: 10px 16px;
+  border-right: 0.5px solid var(--color-border-tertiary);
+  min-width: 0;
+}
+.cust-stat:last-child {
+  border-right: none;
+}
+.cust-stat-label {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+.cust-stat-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.cust-stat-value.warning {
+  color: var(--color-text-warning);
+}
+.cust-limit-edit {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.cust-inline-btn {
+  margin-left: 8px;
+}
+.cust-detail-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cust-payment-form {
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-lg);
+  padding: 14px 16px;
+  background: var(--color-background-secondary);
+}
+.cust-payment-header {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+.cust-payment-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+.cust-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.cust-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.cust-table th {
+  padding: 7px 12px;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  text-align: left;
+  background: var(--color-background-secondary);
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.cust-table td {
+  padding: 9px 12px;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.cust-row-btn {
+  padding: 6px 10px;
+  border-radius: var(--border-radius-md);
+  border: 0.5px solid var(--color-border-secondary);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cust-confirm-btn {
+  padding: 6px 12px;
+  border-radius: var(--border-radius-md);
+  border: none;
+  background: var(--color-brand-green);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cust-confirm-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (max-width: 720px) {
+  .cust-body {
+    grid-template-columns: 1fr;
+  }
+}

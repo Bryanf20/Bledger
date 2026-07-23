@@ -40,6 +40,8 @@ SYNCED_TABLES = {
     "suppliers_purchase": 1,
     "suppliers_purchaselineitem": 1,
     "suppliers_purchasepayment": 1,
+    "customers_customer": 1,
+    "customers_customerpayment": 1,
 }
 
 

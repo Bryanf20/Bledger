@@ -25,8 +25,21 @@ def build_receipt_context(sale):
         for item in sale.line_items.select_related("product").all()
     ]
 
+    # On a credit sale, show who owes and their balance after this sale
+    # (Phase 2 §4.5) so the customer has a record of the debt.
+    customer_name = None
+    customer_balance_str = None
+    if sale.customer_id is not None:
+        from apps.customers.services import customer_balance
+
+        customer_name = sale.customer.name
+        if sale.payment_method == sale.CREDIT:
+            customer_balance_str = format_xaf(customer_balance(sale.customer))
+
     return {
         "business_name": branch.business_name,
+        "customer_name": customer_name,
+        "customer_balance": customer_balance_str,
         "branch_name": branch.branch_name,
         "address": branch.address,
         "phone": branch.phone,

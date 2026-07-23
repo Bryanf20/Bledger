@@ -31,6 +31,7 @@
 .inv-page,
 .sh-page,
 .sup-page,
+.cust-page,
 .dash-page {
   height: 100vh;
   overflow: hidden;
@@ -58,6 +59,7 @@
 .inv-screen,
 .sh-screen,
 .sup-screen,
+.cust-screen,
 .dash-screen {
   flex: 1;
   min-height: 0;

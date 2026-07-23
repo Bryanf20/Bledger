@@ -145,6 +145,47 @@
 .pos-cart-variance.up {
   color: var(--color-text-success);
 }
+
+/* Credit sale (Phase 2 §4). */
+.pos-credit-balance {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin: 6px 0;
+}
+.pos-customer-picker {
+  width: 320px;
+  max-width: 100%;
+}
+.pos-customer-list {
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pos-customer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.pos-customer-row:hover {
+  background: var(--color-background-secondary);
+}
+.pos-customer-owes {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
 .pos-held-btn {
   border-color: #ef9f27;
   color: var(--color-text-warning);

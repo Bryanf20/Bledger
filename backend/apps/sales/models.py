@@ -9,10 +9,15 @@ class Sale(BaseModel):
     MTN_MOMO = "mtn_momo"
     ORANGE_MONEY = "orange_money"
     OTHER = "other"
+    # Credit (Phase 2 §4): the sale is on account — the customer owes it.
+    # A credit sale must name a customer and adds its total to that
+    # customer's derived balance until paid.
+    CREDIT = "credit"
     PAYMENT_METHOD_CHOICES = [
         (CASH, "Cash"),
         (MTN_MOMO, "MTN MoMo"),
         (ORANGE_MONEY, "Orange Money"),
+        (CREDIT, "Credit"),
         (OTHER, "Other"),
     ]
 
@@ -25,6 +30,18 @@ class Sale(BaseModel):
 
     cashier = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="sales"
+    )
+    # Set for credit sales (and optionally for cash sales, as an
+    # attribution). PROTECT: a customer with sales is never hard-deleted
+    # (they soft-deactivate instead), and their credit sales must survive
+    # for balance derivation. String reference avoids importing the
+    # customers app at model-load time. (Phase 2 §4)
+    customer = models.ForeignKey(
+        "customers.Customer",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="sales",
     )
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
 

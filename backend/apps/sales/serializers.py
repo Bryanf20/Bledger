@@ -4,12 +4,15 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.auth_users.approvals import (
+    PURPOSE_CREDIT_OVERRIDE,
     PURPOSE_PRICE_VARIANCE,
     ApprovalError,
     verify_approval_token,
 )
 from apps.auth_users.models import BledgerUser
 from apps.core.utils.xaf import round_xaf
+from apps.customers.models import Customer, CustomerPayment
+from apps.customers.services import customer_balance
 from apps.inventory.models import Product
 from apps.inventory.services import resolve_price_bounds, weighted_average_cost
 from apps.sync.models import OutboxEntry
@@ -80,19 +83,26 @@ class SaleSerializer(serializers.ModelSerializer):
     # price falls outside the allowed band (§3.2). Absent for a normal
     # sale; required the moment any line breaches its bounds.
     approval_token = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    # A separate one-shot token (purpose "credit_override") authorising a
+    # credit sale that would push the customer past their credit_limit
+    # (§4.2). Distinct from approval_token because one sale can, in
+    # principle, need both a price approval and a credit approval.
+    credit_approval_token = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    customer_name = serializers.CharField(source="customer.name", read_only=True, default=None)
 
     class Meta:
         model = Sale
         fields = [
-            "id", "reference", "cashier", "cashier_name", "payment_method",
+            "id", "reference", "cashier", "cashier_name", "customer",
+            "customer_name", "payment_method",
             "momo_reference", "momo_confirmed", "subtotal", "tax_amount",
             "total_amount", "amount_tendered", "status", "voided_by",
             "void_reason", "voided_at", "line_items", "items", "approval_token",
-            "created_at",
+            "credit_approval_token", "created_at",
         ]
         read_only_fields = [
-            "id", "reference", "cashier", "cashier_name", "subtotal",
-            "tax_amount", "total_amount", "status", "voided_by",
+            "id", "reference", "cashier", "cashier_name", "customer_name",
+            "subtotal", "tax_amount", "total_amount", "status", "voided_by",
             "void_reason", "voided_at", "line_items", "created_at",
         ]
 
@@ -109,13 +119,19 @@ class SaleSerializer(serializers.ModelSerializer):
                 )
         if not attrs.get("items"):
             raise serializers.ValidationError({"items": "A sale must have at least one line item."})
+        if attrs.get("payment_method") == Sale.CREDIT and attrs.get("customer") is None:
+            raise serializers.ValidationError(
+                {"customer": "A credit sale must be attached to a customer."}
+            )
         return attrs
 
     def create(self, validated_data):
         items_data = validated_data.pop("items")
-        # Popped here so it isn't forwarded into Sale.objects.create() —
-        # it's an authorisation input, not a Sale field.
+        # Popped here so they aren't forwarded into Sale.objects.create() —
+        # these are authorisation inputs, not Sale fields.
         approval_token = validated_data.pop("approval_token", "")
+        credit_approval_token = validated_data.pop("credit_approval_token", "")
+        self._credit_approval_token = credit_approval_token
         # Sale.reference is unique at the DB level — two concurrent
         # writers can compute the same "next" reference, in which case
         # the loser's INSERT raises IntegrityError and the attempt is
@@ -248,6 +264,28 @@ class SaleSerializer(serializers.ModelSerializer):
             tax_amount = 0  # no tax in Phase 1 — receipt shows "Tax (0%)"
             total_amount = subtotal + tax_amount
 
+            # Credit-limit enforcement (§4.2). The amount going on account
+            # is the total minus any upfront cash (amount_tendered). If it
+            # would push the customer past their credit_limit, the sale
+            # needs a manager credit-override token — the actual control,
+            # server-side.
+            customer = validated_data.get("customer")
+            if validated_data.get("payment_method") == Sale.CREDIT:
+                upfront = validated_data.get("amount_tendered") or 0
+                going_on_credit = max(total_amount - upfront, 0)
+                projected_balance = max(customer_balance(customer), 0) + going_on_credit
+                if projected_balance > customer.credit_limit:
+                    try:
+                        credit_approver_id = verify_approval_token(
+                            self._credit_approval_token, purpose=PURPOSE_CREDIT_OVERRIDE
+                        )
+                    except ApprovalError as exc:
+                        raise serializers.ValidationError({"credit_approval_token": str(exc)})
+                    if not BledgerUser.objects.filter(pk=credit_approver_id, is_active=True).exists():
+                        raise serializers.ValidationError(
+                            {"credit_approval_token": "The approving manager could not be found."}
+                        )
+
             # Branch code comes from the cashier's own Branch row, not
             # settings.BRANCH_ID -- Phase 2 §2.3 moves branch identity
             # onto the Branch record, and the cashier is always a member
@@ -301,6 +339,26 @@ class SaleSerializer(serializers.ModelSerializer):
                 if not is_brokered:
                     product.stock_level = F("stock_level") - payload["quantity"]
                     product.save(update_fields=["stock_level", "updated_at", "version"])
+
+            # Upfront cash on a credit sale becomes a CustomerPayment, so
+            # the customer's derived balance nets it immediately (§4.1) —
+            # otherwise the full total would show as owed. Only for credit;
+            # for a cash sale amount_tendered is just change-making info.
+            if validated_data.get("payment_method") == Sale.CREDIT:
+                upfront = validated_data.get("amount_tendered") or 0
+                if upfront > 0:
+                    payment = CustomerPayment.objects.create(
+                        branch_id=branch_id,
+                        customer=customer,
+                        amount=min(upfront, total_amount),
+                        payment_date=timezone.localdate(),
+                        payment_method=Sale.CASH,
+                        recorded_by=request.user,
+                        note=f"Paid at time of credit sale {reference}",
+                    )
+                    write_outbox_entry(
+                        instance=payment, operation=OutboxEntry.INSERT, branch_id=branch_id
+                    )
 
             write_outbox_entry(instance=sale, operation=OutboxEntry.INSERT, branch_id=branch_id)
 

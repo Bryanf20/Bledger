@@ -11,6 +11,7 @@ import ReceiptScreen from "./features/receipt/ReceiptScreen";
 import InventoryScreen from "./features/inventory/InventoryScreen";
 import SalesHistoryScreen from "./features/sales/SalesHistoryScreen";
 import SuppliersScreen from "./features/suppliers/SuppliersScreen";
+import CustomersScreen from "./features/customers/CustomersScreen";
 import DashboardScreen from "./features/dashboard/DashboardScreen";
 
 function FullPageLoader() {
@@ -134,6 +135,19 @@ export default function App() {
             <RequireSetupComplete>
               <RequireAuth>
                 <SalesHistoryScreen />
+              </RequireAuth>
+            </RequireSetupComplete>
+          }
+        />
+        {/* Customers are cashier-visible (select at POS, record payments);
+            only credit-limit edits are manager-gated, enforced inside the
+            screen + the API rather than by a RoleGuard on the route. */}
+        <Route
+          path="/customers"
+          element={
+            <RequireSetupComplete>
+              <RequireAuth>
+                <CustomersScreen />
               </RequireAuth>
             </RequireSetupComplete>
           }

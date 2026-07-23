@@ -25,6 +25,7 @@ urlpatterns = [
     path("api/v1/", include("apps.inventory.urls")),
     path("api/v1/", include("apps.sales.urls")),
     path("api/v1/", include("apps.suppliers.urls")),
+    path("api/v1/", include("apps.customers.urls")),
     path("api/v1/", include("apps.dashboard.urls")),
     # path("api/v1/sync/", include("apps.sync.urls")),  # Phase 2, 503 until enabled
 ]

@@ -266,6 +266,18 @@ New **Customers** screen, master-detail, closely mirroring Suppliers: directory 
 
 Also: aged-debt report (0–30 / 31–60 / 60+ days) on the dashboard, and customer balance on printed receipts for credit sales.
 
+### 4.6 Implementation notes (Stage 2, step 7 — ✅ done)
+
+**Decision applied (§4.4): branch-scoped customers** — keeps the sync model intact (no shared editable records), the same property that makes multi-branch tractable.
+
+- **New `customers` app** — `Customer` (branch-scoped, `credit_limit`, `is_active`) and append-only `CustomerPayment`. Registered in `INSTALLED_APPS`, `SYNCED_TABLES`, outbox-written on create. Migration `customers/0001`.
+- **Balance is derived, never stored** (`services.customer_balance`): Σ(completed credit sale totals) − Σ(payments); voided sales excluded. Aging (`aging_buckets`) applies payments FIFO oldest-first and buckets the still-unpaid sales into 0–30 / 31–60 / 61+.
+- **Sale** gained a nullable `customer` FK and a `credit` payment method (migration `sales/0005`). A credit sale must name a customer; the amount going on account (total − any upfront `amount_tendered`) is checked against `credit_limit`, and over-limit needs a `credit_override` approval token — a **separate** field from the price-variance token, since one sale can need both (the server checks price first, then credit). Upfront cash becomes a `CustomerPayment` so the balance nets immediately. Credit-sale receipts show the customer and new balance.
+- **Endpoints** — `CustomerViewSet` (list/create/retrieve = cashier+, so the till can register a walk-in and pick them; PATCH incl. `credit_limit` = manager+; `record-payment` = cashier+; `aged-debt` = manager+). A cashier-created customer starts at a 0 limit — every credit sale needs approval until a manager raises it, which is a safe default.
+- **Frontend** — POS gained a Credit method, a customer picker (search + quick-add), an optional upfront-cash field, and the over-limit approval flow (reusing `ApprovalPrompt` with purpose `credit_override`; tokens accumulate so a price+credit sale is handled in two prompts). New **Customers** screen (master-detail: balance, remaining credit, manager-only credit-limit edit, record-payment, payment history) + nav entry + route. esbuild-validated, not `npm run build`-tested.
+- Tests: `customers/tests/test_credit.py` (16). Full suite green except the pre-existing WeasyPrint tests.
+- **Follow-on:** the aged-debt *report UI* (backend `GET /customers/aged-debt/` is done and tested) — a dashboard/customers-screen card. Small, deferred.
+
 ---
 
 ## 5. Workstream D — Barcode scanning **[PROPOSED]**
@@ -667,7 +679,7 @@ These ship without any cloud, so they reach real users fast and de-risk the sche
 | 5 | **Cost tracking (§7A)** — snapshot fixes, `ProductPriceHistory`, WAC on `Product`, COGS on sale lines, migration backfill | Profit becomes computable at all — ✅ **done** |
 | 5b | **Brokered sales (§7B.1)** — `SaleLineItem.is_brokered`/`source_note`, no-stock sale path, external cost as COGS | Captures the neighbour-sourcing gain; small, extends step 5 — ✅ **done** |
 | 6 | Negotiated pricing (§3) — bounds config, POS price editing, server enforcement, variance reporting | The culturally-critical feature — ✅ **done** |
-| 7 | Customer accounts & credit (§4) — models, POS integration, Customers screen, aged-debt report | Removes a real blind spot in daily cash |
+| 7 | Customer accounts & credit (§4) — models, POS integration, Customers screen, aged-debt report | Removes a real blind spot in daily cash — ✅ **done** |
 | 8 | Margin & valuation reporting (§7A.6) — margin dashboard, stock valuation, margin-squeeze alerts | The owner-facing payoff of step 5 |
 | 8b | **Finances & cashbook (§7B.2–7B.3)** — `ExpenseCategory`/`CashbookEntry`, Finances screen, net-profit P&L | Gross margin becomes *net* profit; pairs with step 8 |
 

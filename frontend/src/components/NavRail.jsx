@@ -31,6 +31,10 @@ const NAV_ITEMS = [
   { to: "/pos", label: "POS", icon: "🛒", minimumRole: "cashier" },
   { to: "/sales", label: "Sales", icon: "🧾", minimumRole: "cashier" },
   { to: "/inventory", label: "Inventory", icon: "📦", minimumRole: "cashier" },
+  // Customers are cashier-visible: a cashier selects them at the till and
+  // records payments; only credit-limit edits are manager-gated (enforced
+  // in the screen and the API, not by hiding the nav item).
+  { to: "/customers", label: "Customers", icon: "👤", minimumRole: "cashier" },
   { to: "/suppliers", label: "Suppliers", icon: "🚚", minimumRole: "manager" },
   { to: "/dashboard", label: "Dashboard", icon: "📊", minimumRole: "manager" },
 ];
