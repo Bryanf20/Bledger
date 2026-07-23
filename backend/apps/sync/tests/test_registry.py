@@ -30,6 +30,7 @@ PROJECT_APP_LABELS = {
     "suppliers",
     "customers",
     "finances",
+    "activity",
     "dashboard",
     "sync",
 }

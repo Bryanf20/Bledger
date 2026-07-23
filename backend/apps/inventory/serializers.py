@@ -7,6 +7,7 @@ so atomically inside a transaction so stock_before/stock_after snapshots
 stay trustworthy for the audit trail.
 """
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.sync.models import OutboxEntry
@@ -189,14 +190,28 @@ class StockAdjustmentSerializer(serializers.ModelSerializer):
     those two fields, plus adjusted_by, are never client-supplied.
     """
     product_name = serializers.CharField(source="product.name", read_only=True)
+    # Write-only confirmation that a damage/expiry removal should also be
+    # booked as a Losses/Damage expense (§7B.2 / step 8d). The frontend
+    # computes the default amount (|qty| × average_cost) and lets the
+    # user confirm or edit it — hence "ask each time", the amount is the
+    # confirmed value rather than something the server imposes silently.
+    book_as_expense = serializers.BooleanField(write_only=True, required=False, default=False)
+    expense_amount = serializers.IntegerField(write_only=True, required=False, min_value=0)
+    # Read-back so the client can show "booked N XAF" after the fact.
+    booked_expense_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = StockAdjustment
         fields = [
             "id", "product", "product_name", "adjustment_type", "quantity",
             "reason", "adjusted_by", "stock_before", "stock_after", "created_at",
+            "book_as_expense", "expense_amount", "booked_expense_amount",
         ]
         read_only_fields = ["id", "adjusted_by", "stock_before", "stock_after", "created_at"]
+
+    def get_booked_expense_amount(self, obj):
+        entry = obj.booked_expenses.first() if hasattr(obj, "booked_expenses") else None
+        return entry.amount if entry else None
 
     def validate(self, attrs):
         adj_type = attrs["adjustment_type"]
@@ -207,12 +222,20 @@ class StockAdjustmentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Quantity must be negative for a 'remove' adjustment.")
         if not attrs.get("reason", "").strip():
             raise serializers.ValidationError("A reason is required for every stock adjustment.")
+        # Booking an expense only makes sense for a removal (damage/expiry);
+        # an 'add' or 'correction' has no loss to write off.
+        if attrs.get("book_as_expense") and adj_type != "remove":
+            raise serializers.ValidationError(
+                {"book_as_expense": "Only a 'remove' adjustment can be booked as a loss expense."}
+            )
         return attrs
 
     def create(self, validated_data):
         request = self.context["request"]
         product = validated_data["product"]
         quantity = validated_data["quantity"]
+        book_as_expense = validated_data.pop("book_as_expense", False)
+        expense_amount = validated_data.pop("expense_amount", None)
 
         with transaction.atomic():
             locked_product = Product.objects.select_for_update().get(pk=product.pk)
@@ -236,10 +259,72 @@ class StockAdjustmentSerializer(serializers.ModelSerializer):
             # purchase (and void restoration) moves the cost basis.
             locked_product.stock_level = stock_after
             locked_product.save(update_fields=["stock_level", "updated_at", "version"])
- 
+
             write_outbox_entry(instance=adjustment, operation=OutboxEntry.INSERT, branch_id=request.branch_id)
- 
+
+            booked = None
+            if book_as_expense:
+                # Lazy import: finances depends on inventory (the FK), so
+                # importing it at module scope would form a cycle.
+                booked = self._book_loss_expense(request, locked_product, quantity, expense_amount, adjustment)
+
+            self._log_adjustment(request, locked_product, adjustment, booked)
+
         return adjustment
+
+    @staticmethod
+    def _log_adjustment(request, product, adjustment, booked_entry):
+        from apps.activity.services import log_activity
+
+        action = adjustment.adjustment_type  # add | remove | correction
+        summary = f"Stock {action}: {product.name} {adjustment.quantity:+d} ({adjustment.reason})"
+        log_activity(
+            request,
+            action="stock.adjust",
+            summary=summary,
+            target=adjustment,
+            metadata={"quantity": adjustment.quantity, "type": action},
+        )
+        if booked_entry is not None:
+            log_activity(
+                request,
+                action="stock.loss_booked",
+                summary=f"Booked {booked_entry.amount:,} XAF loss for {product.name}",
+                target=booked_entry,
+                metadata={"amount": booked_entry.amount},
+            )
+
+    @staticmethod
+    def _book_loss_expense(request, product, quantity, expense_amount, adjustment):
+        """Create the Losses/Damage cashbook expense for a confirmed
+        damage/expiry removal (step 8d). Amount defaults to the value lost
+        at cost (|qty| × average_cost); a product with no cost basis has
+        nothing to write off, so no entry is created."""
+        from apps.finances.models import CashbookEntry, ExpenseCategory
+
+        if expense_amount is None:
+            expense_amount = abs(quantity) * (product.average_cost or 0)
+        if not expense_amount:
+            return None  # cost-unknown or zero — nothing to book
+
+        # Default manager already excludes soft-deleted rows, so this
+        # reuses an existing Losses/Damage category or seeds it on demand.
+        category, _ = ExpenseCategory.objects.get_or_create(
+            branch_id=request.branch_id,
+            name="Losses/Damage",
+        )
+        entry = CashbookEntry.objects.create(
+            branch_id=request.branch_id,
+            direction=CashbookEntry.EXPENSE,
+            category=category,
+            amount=expense_amount,
+            occurred_on=timezone.localdate(),
+            description=f"Damage/expiry: {product.name} ×{abs(quantity)}",
+            recorded_by=request.user,
+            source_adjustment=adjustment,
+        )
+        write_outbox_entry(instance=entry, operation=OutboxEntry.INSERT, branch_id=request.branch_id)
+        return entry
 
 
 class ProductTemplateSerializer(serializers.ModelSerializer):

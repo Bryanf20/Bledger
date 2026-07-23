@@ -332,6 +332,41 @@ class LowMarginView(APIView):
         return Response({"threshold_pct": threshold, "products": rows})
 
 
+class BrokeredSummaryView(APIView):
+    """GET /api/v1/dashboard/brokered-summary/?period=today|week|month
+
+    The gain from brokered / commission sales (§7B.1 / §7C.4): items the
+    vendor sourced from a neighbour at delivery, marked up, and pocketed
+    the difference. Gain per line is (actual_price − unit_cost_at_sale) ×
+    quantity over completed brokered lines in the period. Manager+."""
+
+    permission_classes = [IsManagerOrOwner]
+
+    def get(self, request):
+        period = resolve_period(request.query_params.get("period"))
+        start, end = period_range(period)
+        lines = SaleLineItem.objects.filter(
+            sale__in=_branch_sales(request, start, end), is_brokered=True
+        )
+        agg = lines.aggregate(
+            revenue=Coalesce(Sum("line_total"), Value(0, output_field=IntegerField())),
+            cost=Coalesce(
+                Sum(F("unit_cost_at_sale") * F("quantity")),
+                Value(0, output_field=IntegerField()),
+            ),
+            count=Count("id"),
+        )
+        return Response(
+            {
+                "period": period,
+                "gain": agg["revenue"] - agg["cost"],
+                "revenue": agg["revenue"],
+                "cost": agg["cost"],
+                "line_count": agg["count"],
+            }
+        )
+
+
 class SalesChartView(APIView):
     """GET /api/v1/dashboard/sales-chart/?period=today|week|month
 

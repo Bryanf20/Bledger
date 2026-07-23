@@ -13,6 +13,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.activity.services import log_activity
 from apps.core.permissions import IsCashierOrAbove, IsManagerOrOwner
 from apps.sync.models import OutboxEntry
 from apps.sync.utils import write_outbox_entry
@@ -61,8 +62,18 @@ class CustomerViewSet(BranchScopedQuerysetMixin, viewsets.ModelViewSet):
         write_outbox_entry(instance=instance, operation=OutboxEntry.INSERT)
 
     def perform_update(self, serializer):
+        old_limit = serializer.instance.credit_limit
         instance = serializer.save()
         write_outbox_entry(instance=instance, operation=OutboxEntry.UPDATE)
+        # The credit limit is the one edit worth surfacing in the log —
+        # it's how a manager extends the shop's exposure to a customer.
+        if instance.credit_limit != old_limit:
+            log_activity(
+                self.request, action="credit.limit_change",
+                summary=f"Set {instance.name}'s credit limit to {instance.credit_limit:,} XAF",
+                target=instance,
+                metadata={"from": old_limit, "to": instance.credit_limit},
+            )
 
     @action(detail=True, methods=["post"], url_path="record-payment")
     def record_payment(self, request, pk=None):

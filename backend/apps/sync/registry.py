@@ -44,6 +44,7 @@ SYNCED_TABLES = {
     "customers_customerpayment": 1,
     "finances_expensecategory": 1,
     "finances_cashbookentry": 1,
+    "activity_activitylog": 1,
 }
 
 

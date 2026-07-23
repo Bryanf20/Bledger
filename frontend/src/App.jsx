@@ -13,6 +13,8 @@ import SalesHistoryScreen from "./features/sales/SalesHistoryScreen";
 import SuppliersScreen from "./features/suppliers/SuppliersScreen";
 import CustomersScreen from "./features/customers/CustomersScreen";
 import FinancesScreen from "./features/finances/FinancesScreen";
+import LogsScreen from "./features/activity/LogsScreen";
+import SettingsScreen from "./features/settings/SettingsScreen";
 import DashboardScreen from "./features/dashboard/DashboardScreen";
 
 function FullPageLoader() {
@@ -184,6 +186,35 @@ export default function App() {
               <RequireAuth>
                 <RoleGuard minimumRole="manager" redirectTo="/pos">
                   <FinancesScreen />
+                </RoleGuard>
+              </RequireAuth>
+            </RequireSetupComplete>
+          }
+        />
+        {/* Manager+ (audit is above the till). Managers see the key
+            events, owners see everything — the tiering is server-side in
+            ActivityLogViewSet, so the same route serves both; RoleGuard
+            only keeps cashiers out. */}
+        <Route
+          path="/logs"
+          element={
+            <RequireSetupComplete>
+              <RequireAuth>
+                <RoleGuard minimumRole="manager" redirectTo="/pos">
+                  <LogsScreen />
+                </RoleGuard>
+              </RequireAuth>
+            </RequireSetupComplete>
+          }
+        />
+        {/* Owner-only — every settings/staff endpoint is IsOwner. */}
+        <Route
+          path="/settings"
+          element={
+            <RequireSetupComplete>
+              <RequireAuth>
+                <RoleGuard minimumRole="owner" redirectTo="/pos">
+                  <SettingsScreen />
                 </RoleGuard>
               </RequireAuth>
             </RequireSetupComplete>

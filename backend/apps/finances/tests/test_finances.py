@@ -181,5 +181,11 @@ def test_pnl_net_profit_math(owner_user, cashier_user, rent_category):
     assert resp.data["expenses_by_category"][0]["total"] == 5000
 
 
-def test_pnl_is_owner_only(manager_user):
-    assert client_for(manager_user).get("/api/v1/finances/pnl/").status_code == 403
+def test_pnl_visible_to_manager(manager_user):
+    # Relaxed to manager+ in step 8f (§7C.4) so the dashboard can show
+    # net profit alongside the other manager-visible financials.
+    assert client_for(manager_user).get("/api/v1/finances/pnl/").status_code == 200
+
+
+def test_pnl_forbidden_for_cashier(cashier_user):
+    assert client_for(cashier_user).get("/api/v1/finances/pnl/").status_code == 403

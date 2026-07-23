@@ -196,6 +196,15 @@
   background: var(--color-background-primary);
   padding: 14px 16px;
 }
+/* Net-profit headline card (step 8f) — the one figure the owner most
+   wants at a glance, so it's visually lifted from the rest. */
+.dash-card-highlight {
+  border-color: var(--color-border-secondary);
+  background: var(--color-background-secondary);
+}
+.dash-negative {
+  color: var(--color-text-danger);
+}
 .dash-card-title {
   font-size: 13px;
   font-weight: 700;

@@ -6,7 +6,7 @@ financial data, so all three endpoints are manager-only.
 import pytest
 
 from apps.inventory.models import Product
-from apps.sales.models import Sale
+from apps.sales.models import Sale, SaleLineItem
 
 from .conftest import BRANCH_ID, make_sale
 
@@ -52,6 +52,48 @@ def test_voided_sale_excluded_from_margin(manager_client, cashier_user, product)
 
 def test_margin_summary_manager_only(cashier_client):
     assert cashier_client.get("/api/v1/dashboard/margin-summary/").status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Brokered-sale gains (§7C.4 / step 8f)
+# ---------------------------------------------------------------------------
+
+
+def _brokered_line(cashier, product, qty, price, cost):
+    total = qty * price
+    sale = Sale.objects.create(
+        branch_id=BRANCH_ID, cashier=cashier, payment_method=Sale.CASH,
+        subtotal=total, total_amount=total, status=Sale.COMPLETED,
+        reference=f"BLD-BR-{Sale.objects.count() + 1:04d}",
+    )
+    SaleLineItem.objects.create(
+        branch_id=BRANCH_ID, sale=sale, product=product, quantity=qty,
+        catalogue_price=price, actual_price=price, unit_cost_at_sale=cost,
+        line_total=total, is_brokered=True,
+    )
+    return sale
+
+
+def test_brokered_gain_is_markup_over_external_cost(manager_client, cashier_user, product):
+    # Sourced at 3000, sold at 4000, qty 3 → gain 3000.
+    _brokered_line(cashier_user, product, 3, 4000, 3000)
+    resp = manager_client.get("/api/v1/dashboard/brokered-summary/?period=today")
+    assert resp.status_code == 200
+    assert resp.data["revenue"] == 12000
+    assert resp.data["cost"] == 9000
+    assert resp.data["gain"] == 3000
+    assert resp.data["line_count"] == 1
+
+
+def test_brokered_summary_excludes_normal_lines(manager_client, cashier_user, product):
+    make_sale(cashier_user, product, 2, 4500, unit_cost=3000)  # normal, not brokered
+    resp = manager_client.get("/api/v1/dashboard/brokered-summary/?period=today")
+    assert resp.data["gain"] == 0
+    assert resp.data["line_count"] == 0
+
+
+def test_brokered_summary_manager_only(cashier_client):
+    assert cashier_client.get("/api/v1/dashboard/brokered-summary/").status_code == 403
 
 
 # ---------------------------------------------------------------------------

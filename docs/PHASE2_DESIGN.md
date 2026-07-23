@@ -31,6 +31,7 @@ Workstream A (sync) and B (negotiated pricing) are largely **[DOC]**. Workstream
 | **F** | Settings module | [PROPOSED] | Touches all of the above |
 | **G** | Cost tracking & profitability | [PROPOSED] | Inventory + suppliers (stable) |
 | **H** | Finances & cashbook (expenses, net profit, brokered sales) | [PROPOSED] | Cost tracking (G) |
+| **I** | Pre-sync follow-ups (activity log, loss booking, admin screens, dashboard revamp) | [IN PROGRESS] §7C | Finances (H) |
 
 Three principles carry through every workstream:
 
@@ -621,6 +622,48 @@ Two steps, both Stage 2:
 
 ---
 
+## 7C. Workstream I — pre-sync follow-ups (activity log, loss booking, admin screens, dashboard) **[IN PROGRESS]**
+
+A batch of gaps raised after step 8b, hashed out before Stage 3 because two of them touch the schema and are far cheaper to land before the sync engine freezes table shapes. Decisions recorded here are the ones the owner chose when asked.
+
+### 7C.1 Activity log (§ step 8c) — ✅ **backend done**
+
+A unified, append-only trail of the *major* things that happen in a branch, so an owner can answer "who did what, when" from one screen. **Sales are excluded** — they already have history + receipts, and logging every sale would drown the signal.
+
+**Decision — two visibility tiers:** managers see only the key operational events (`is_major=True`); **owners see everything**, including fine-grained owner-only detail. Cashiers have no access (audit sits above the till).
+
+Model `activity.ActivityLog(BaseModel)`: `action` (dotted key), `summary` (human one-liner, shown verbatim), `is_major`, `actor` FK (SET_NULL), loose `target_type`/`target_id` (no cross-app FK — the log must outlive a hard-deleted target and points across many apps), `metadata` JSON. Append-only (never edited/deleted), branch-owned, `SYNCED`. Written **only** through `activity.services.log_activity(request, action=…, summary=…, target=…)`; the read API is list-only.
+
+Wired at the key events (all `is_major`): `auth.login`, `sale.void`, `expense.record|edit|delete`, `staff.create|update|deactivate|reset_pin`, `stock.adjust`, `stock.loss_booked`, `credit.limit_change`, `settings.update`. Non-major (owner-only) catalogue events (`product.*`, `category.*`, `supplier.*`, `purchase.*`) can be layered in later against the same helper without schema change. 9 backend tests (visibility tiers, branch scoping, action filter, and that login/expense/credit-limit/staff-create actually log).
+
+> **Frontend done.** `features/activity/LogsScreen.{jsx,css}` + `api/activity.js` + `hooks/useActivity.js`. Paginated table (When / Who / Event / Detail) with friendly action labels + icons and an action-filter dropdown; a scope hint tells managers they see key events while owners see all. Manager+ route (`RoleGuard`), 📋 Logs nav item, `.log-page`/`.log-screen` in the shared layout groups.
+
+### 7C.2 Damage/expiry booked as a loss expense (§ step 8d) — ✅ **backend done**
+
+Previously a "remove (damage/expiry)" stock adjustment just decremented stock and booked nothing financial — the lost value silently vanished. Now the value lost at cost (`|qty| × average_cost`) can be booked as a **Losses/Damage** cashbook expense (the category we already seed), linking the two sides of the ledger so gross margin becomes an honest net.
+
+**Decision — confirm each time:** the person doing the removal confirms (and may edit) the amount before it's booked, rather than the system booking silently. Implemented as write-only `book_as_expense` + `expense_amount` on the stock-adjustment endpoint; the frontend computes the default and asks. Only a `remove` adjustment can book a loss (an `add`/`correction` has nothing to write off); a cost-unknown product books nothing. New nullable `CashbookEntry.source_adjustment` FK (→ `inventory.StockAdjustment`) records the link and guards against double-booking; string-ref + lazy import keep finances↔inventory acyclic. 5 backend tests.
+
+> **Frontend done.** `AdjustStockPanel.jsx` gains a loss-booking box that appears only for a "remove (damage/expiry)" on a cost-known product: a "book this loss as a Losses/Damage expense" checkbox (defaulted on) and an editable amount pre-filled with `|qty| × average_cost`. Cost-unknown products show an explanatory note instead. `useCreateStockAdjustment` now also invalidates cashbook / P&L / activity so a booked loss appears immediately.
+
+### 7C.3 Admin screens (§ step 8e) — ✅ **done (frontend)**
+
+The **Settings** and **Staff management** backends already shipped in Stage 2, step 2 (`settings/business`, `settings/preferences`, `users/…`). Only the frontend screens were missing; no schema work. Owner-only.
+
+> **Implemented.** One owner-only `features/settings/SettingsScreen.jsx` with three tabs: **Business** (branch details; `code` shown read-only, it's immutable after setup), **Preferences** (the policy defaults — discount floor, surplus ceiling, deviation alert, default credit limit, margin alert), and **Staff** (directory + add cashier/manager with the right credential per role, deactivate/reactivate, reset PIN; the owner can't deactivate themselves). `api/settings.js` + `hooks/useSettings.js`; ⚙️ Settings nav item (owner-only); `RoleGuard minimumRole="owner"`.
+
+### 7C.4 Dashboard revamp (§ step 8f) — ✅ **done**
+
+**Decision — add these manager+ widgets:** net profit (gross margin − expenses + income — the honest bottom line, fixing the "dashboard shows gross, not net" gap), period expenses total + by-category, outstanding customer credit (total owed now + count in debt), and brokered-sale gains. Cashiers stay out of finances, so all four are manager+.
+
+> **Implemented.** `PnLView` relaxed to manager+ (finances test updated: manager 200, cashier 403). New `BrokeredSummaryView` (`/dashboard/brokered-summary/`, manager+; gain = Σ(actual_price − unit_cost_at_sale)×qty over brokered lines) + 3 tests. `ProfitCards.jsx` gains a highlighted **Net profit** headline card (red when negative), an **Expenses** card with the by-category breakdown (both from `usePnl`), and a **Brokered gains** card (`useBrokeredSummary`). Outstanding customer credit was already present on the dashboard. The Finances P&L panel also relaxed from owner-only to manager+ so there's no split.
+
+> **Reconciliation to confirm:** surfacing net profit on the dashboard is in slight tension with §7B.2's "P&L is owner-only." Since every other dashboard financial (gross margin, COGS, stock valuation) is already manager+, net profit and the expense widgets are made **manager+** for consistency, and the Finances P&L panel relaxes from owner-only to manager+ so there's no split. Owner-only can be restored on request.
+
+**Cashier expenses — decision: NO.** Item 4's "cashiers see only theirs" was resolved by keeping finances manager+ only (§7B.2 preserved); cashiers neither record nor see expenses, so the dashboard expense/net-profit widgets are simply manager+ with no per-cashier scoping.
+
+---
+
 ## 8. Cross-cutting: schema fixes that block everything **[DOC + audit]**
 
 Found by auditing Phase 1 code against this design. All must be fixed before Mode 1 goes live.
@@ -696,6 +739,10 @@ These ship without any cloud, so they reach real users fast and de-risk the sche
 | 7 | Customer accounts & credit (§4) — models, POS integration, Customers screen, aged-debt report | Removes a real blind spot in daily cash — ✅ **done** |
 | 8 | Margin & valuation reporting (§7A.6) — margin dashboard, stock valuation, margin-squeeze alerts | The owner-facing payoff of step 5 — ✅ **done** |
 | 8b | **Finances & cashbook (§7B.2–7B.3)** — `ExpenseCategory`/`CashbookEntry`, Finances screen, net-profit P&L | Gross margin becomes *net* profit; pairs with step 8 — ✅ **done** |
+| 8c | **Activity log (§7C.1)** — `activity.ActivityLog`, `log_activity` wired at key events, role-tiered read API, Logs page | Owner can see who did what; schema-critical, pre-sync — ✅ **done** |
+| 8d | **Damage/expiry → loss expense (§7C.2)** — `CashbookEntry.source_adjustment` FK, confirm-to-book flow | Lost stock stops vanishing from the books; schema-critical, pre-sync — ✅ **done** |
+| 8e | **Admin screens (§7C.3)** — Settings + Staff frontend over existing endpoints | Finishes Stage 2's backend-first admin work; no schema — ✅ **done** |
+| 8f | **Dashboard revamp (§7C.4)** — net profit, expenses + by-category, outstanding credit, brokered gains (manager+) | One honest bottom line + the stats left out — ✅ **done** |
 
 Step 5 lands before negotiated pricing deliberately: once cost exists, the discount floor can enforce "never below cost" (§7A.7), which is a materially stronger control than a percentage-of-catalogue floor alone. Brokered sales (5b) sit right after cost tracking because they're a small extension of it. The finances cashbook (8b) pairs with margin reporting (8) so the dashboard gains one honest bottom line rather than two half-pictures.
 

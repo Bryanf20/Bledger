@@ -72,6 +72,19 @@ class CashbookEntry(BaseModel):
         null=True,
         related_name="cashbook_entries",
     )
+    # When an expense was auto-booked from a damage/expiry stock removal
+    # (§7B.2 / step 8d), this links back to the StockAdjustment that
+    # caused it — traceability, and a guard against double-booking the
+    # same removal. String reference + lazy import at the write site keep
+    # finances↔inventory from forming an import cycle. Null for ordinary
+    # hand-entered expenses.
+    source_adjustment = models.ForeignKey(
+        "inventory.StockAdjustment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="booked_expenses",
+    )
 
     class Meta(BaseModel.Meta):
         ordering = ["-occurred_on", "-created_at"]

@@ -40,6 +40,10 @@ const NAV_ITEMS = [
   // owner-only (gated in the screen, not by hiding the whole nav item).
   { to: "/finances", label: "Finances", icon: "💰", minimumRole: "manager" },
   { to: "/dashboard", label: "Dashboard", icon: "📊", minimumRole: "manager" },
+  // Activity log is manager+ (managers see key events, owners see all —
+  // tiered server-side). Settings is owner-only (staff + business config).
+  { to: "/logs", label: "Logs", icon: "📋", minimumRole: "manager" },
+  { to: "/settings", label: "Settings", icon: "⚙️", minimumRole: "owner" },
 ];
 
 export default function NavRail() {

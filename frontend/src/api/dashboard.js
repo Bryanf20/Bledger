@@ -70,6 +70,12 @@ export async function fetchLowMargin() {
   return data; // { threshold_pct, products[] }
 }
 
+// Brokered / commission-sale gains for the period (§7C.4 / step 8f).
+export async function fetchBrokeredSummary(period) {
+  const { data } = await apiClient.get("/dashboard/brokered-summary/", { params: { period } });
+  return data; // { period, gain, revenue, cost, line_count }
+}
+
 // Customers aged-debt (Phase 2 §4.5).
 export async function fetchAgedDebtReport() {
   const { data } = await apiClient.get("/customers/aged-debt/");

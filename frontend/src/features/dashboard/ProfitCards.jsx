@@ -1,20 +1,25 @@
 import XAFAmount from "../../components/XAFAmount";
 import {
   useAgedDebt,
+  useBrokeredSummary,
   useLowMargin,
   useMarginSummary,
   useStockValuation,
   useVarianceSummary,
 } from "../../hooks/useDashboard";
+import { usePnl } from "../../hooks/useFinances";
 
 // Phase 2 reporting cards (§3.4 variance, §7A.6 margin/valuation, §4.5
-// aged debt). Manager+ — rendered inside DashboardScreen's manager view.
+// aged debt, §7C.4 net profit / expenses / brokered gains). Manager+ —
+// rendered inside DashboardScreen's manager view.
 export default function ProfitCards({ period }) {
   const margin = useMarginSummary(period);
   const variance = useVarianceSummary(period);
   const valuation = useStockValuation();
   const lowMargin = useLowMargin();
   const agedDebt = useAgedDebt();
+  const pnl = usePnl(period); // net profit + expenses (manager+ since step 8f)
+  const brokered = useBrokeredSummary(period);
 
   const m = margin.data;
   const v = variance.data;
@@ -22,9 +27,30 @@ export default function ProfitCards({ period }) {
   const low = lowMargin.data?.products ?? [];
   const debt = agedDebt.data ?? [];
   const totalDebt = debt.reduce((s, r) => s + r.balance, 0);
+  const p = pnl.data;
+  const br = brokered.data;
+  const expenseRows = p?.expenses_by_category ?? [];
 
   return (
     <div className="dash-profit-cards">
+      {/* Net profit — the honest bottom line (§7C.4) */}
+      <div className="dash-card dash-card-highlight">
+        <div className="dash-card-title">Net profit ({period})</div>
+        {pnl.isLoading ? (
+          <div className="dash-card-empty">Loading…</div>
+        ) : (
+          <>
+            <div className={`dash-profit-big${(p?.net_profit ?? 0) < 0 ? " dash-negative" : ""}`}>
+              <XAFAmount value={p?.net_profit ?? 0} />
+            </div>
+            <div className="dash-profit-sub">
+              Margin <XAFAmount value={p?.gross_margin ?? 0} /> − expenses <XAFAmount value={p?.total_expenses ?? 0} />
+              {p?.total_income ? <> + income <XAFAmount value={p.total_income} /></> : null}
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Gross margin */}
       <div className="dash-card">
         <div className="dash-card-title">Gross margin ({period})</div>
@@ -89,6 +115,45 @@ export default function ProfitCards({ period }) {
           <>
             <div className="dash-profit-big"><XAFAmount value={totalDebt} /></div>
             <div className="dash-profit-sub">{debt.length} customer{debt.length === 1 ? "" : "s"} owe you</div>
+          </>
+        )}
+      </div>
+
+      {/* Expenses + by-category (§7C.4) */}
+      <div className="dash-card">
+        <div className="dash-card-title">Expenses ({period})</div>
+        {pnl.isLoading ? (
+          <div className="dash-card-empty">Loading…</div>
+        ) : (p?.total_expenses ?? 0) === 0 ? (
+          <div className="dash-card-empty">No expenses recorded.</div>
+        ) : (
+          <>
+            <div className="dash-profit-big"><XAFAmount value={p.total_expenses} /></div>
+            <div className="dash-low-list">
+              {expenseRows.slice(0, 5).map((c) => (
+                <div key={c.category_id ?? "uncat"} className="dash-low-row">
+                  <span>{c.category_name}</span>
+                  <span><XAFAmount value={c.total} withSuffix={false} /></span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Brokered-sale gains (§7B.1 / §7C.4) */}
+      <div className="dash-card">
+        <div className="dash-card-title">Brokered gains ({period})</div>
+        {brokered.isLoading ? (
+          <div className="dash-card-empty">Loading…</div>
+        ) : (br?.line_count ?? 0) === 0 ? (
+          <div className="dash-card-empty">No brokered sales this period.</div>
+        ) : (
+          <>
+            <div className="dash-profit-big"><XAFAmount value={br.gain} /></div>
+            <div className="dash-profit-sub">
+              {br.line_count} item{br.line_count === 1 ? "" : "s"} · sold <XAFAmount value={br.revenue} />, sourced <XAFAmount value={br.cost} />
+            </div>
           </>
         )}
       </div>

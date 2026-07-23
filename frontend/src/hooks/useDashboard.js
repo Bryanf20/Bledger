@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   fetchAgedDebtReport,
+  fetchBrokeredSummary,
   fetchDashboardSummary,
   fetchLowMargin,
   fetchMarginSummary,
@@ -118,5 +119,13 @@ export function useAgedDebt() {
     queryKey: ["dashboard", "aged-debt"],
     queryFn: fetchAgedDebtReport,
     staleTime: 30_000,
+  });
+}
+
+export function useBrokeredSummary(period) {
+  return useQuery({
+    queryKey: ["dashboard", "brokered-summary", period],
+    queryFn: () => fetchBrokeredSummary(period),
+    staleTime: 15_000,
   });
 }

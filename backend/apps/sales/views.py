@@ -4,6 +4,7 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.activity.services import log_activity
 from apps.core.permissions import ROLE_CASHIER, IsCashierOrAbove, IsManagerOrOwner
 from apps.printing.interface import print_receipt
 from apps.printing.pdf_backend import PrinterDependencyMissing
@@ -79,6 +80,13 @@ class SaleViewSet(BranchScopedQuerysetMixin, viewsets.ModelViewSet):
         serializer = VoidSaleSerializer(data=request.data, context={"sale": sale, "request": request})
         serializer.is_valid(raise_exception=True)
         sale = serializer.save()
+        log_activity(
+            request,
+            action="sale.void",
+            summary=f"Voided sale {sale.reference} ({sale.total_amount:,} XAF)",
+            target=sale,
+            metadata={"reference": sale.reference, "amount": sale.total_amount},
+        )
         return Response(SaleSerializer(sale, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=["get"])

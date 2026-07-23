@@ -76,6 +76,14 @@ export function useCreateStockAdjustment() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createStockAdjustment,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      // A damage/expiry removal can book a Losses/Damage expense and logs
+      // activity (step 8d) — refresh those views too so a booked loss
+      // shows up immediately.
+      queryClient.invalidateQueries({ queryKey: ["cashbook"] });
+      queryClient.invalidateQueries({ queryKey: ["pnl"] });
+      queryClient.invalidateQueries({ queryKey: ["activity"] });
+    },
   });
 }

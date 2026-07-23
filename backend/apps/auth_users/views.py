@@ -12,6 +12,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.activity.services import log_activity
 from apps.core.permissions import IsCashierOrAbove, IsOwner
 from apps.inventory.services import TemplateNotFoundError, list_templates, load_template
 
@@ -57,6 +58,7 @@ class LoginView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
         django_login(request, user)
+        log_activity(request, actor=user, action="auth.login", summary=f"{user.name} signed in ({user.role})")
         return _token_response(user)
 
 
@@ -70,6 +72,7 @@ class PinLoginView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
         django_login(request, user)
+        log_activity(request, actor=user, action="auth.login", summary=f"{user.name} signed in ({user.role})")
         return _token_response(user)
 
 
@@ -270,6 +273,10 @@ class StaffUserListCreateView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        log_activity(
+            request, action="staff.create",
+            summary=f"Created {user.role} account for {user.name}", target=user,
+        )
         return Response(UserProfileSerializer(user).data, status=status.HTTP_201_CREATED)
 
 
@@ -311,7 +318,14 @@ class StaffUserDetailView(APIView):
             if user.is_owner and new_role != BledgerUser.ROLE_OWNER:
                 raise _conflict("You can't change your own owner role.")
 
+        was_active = user.is_active
         serializer.save()
+        user.refresh_from_db()
+        # Deactivation is the notable case; otherwise it's a profile edit.
+        if was_active and not user.is_active:
+            log_activity(request, action="staff.deactivate", summary=f"Deactivated {user.name}", target=user)
+        else:
+            log_activity(request, action="staff.update", summary=f"Updated {user.name}'s account", target=user)
         return Response(StaffUserListSerializer(user).data)
 
 
@@ -330,6 +344,7 @@ class StaffUserResetPinView(APIView):
         serializer.is_valid(raise_exception=True)
         user.set_pin(serializer.validated_data["pin"])
         user.save(update_fields=["pin_hash", "updated_at"])
+        log_activity(request, action="staff.reset_pin", summary=f"Reset PIN for {user.name}", target=user)
         return Response(StaffUserListSerializer(user).data)
 
 
@@ -351,6 +366,11 @@ class SettingsBusinessView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        log_activity(
+            request, action="settings.update",
+            summary="Updated business & branch details",
+            metadata={"fields": list(request.data.keys())},
+        )
         return Response(serializer.data)
 
 
@@ -372,6 +392,11 @@ class BusinessSettingsView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        log_activity(
+            request, action="settings.update",
+            summary="Updated business preferences",
+            metadata={"fields": list(request.data.keys())},
+        )
         return Response(serializer.data)
 
 

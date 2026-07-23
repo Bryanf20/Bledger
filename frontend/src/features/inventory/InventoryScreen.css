@@ -531,6 +531,33 @@
   font-weight: 600;
   color: var(--color-text-primary);
 }
+/* Damage/expiry loss-booking box (step 8d) */
+.inv-loss-box {
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  padding: 10px 12px;
+  background: var(--color-background-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.inv-loss-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+.inv-loss-amount {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.inv-loss-hint {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
 .inv-type-row {
   display: flex;
   flex-direction: column;

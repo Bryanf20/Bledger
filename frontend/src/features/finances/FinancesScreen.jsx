@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { hasRole } from "../../components/RoleGuard";
 import ScreenTopbar from "../../components/ScreenTopbar";
 import ToastStack from "../../components/ToastStack";
 import Banner from "../../components/Banner";
@@ -36,14 +35,15 @@ function todayISO() {
 // here and by IsOwner on the endpoint). Whole screen is manager-gated by
 // a RoleGuard on the route in App.jsx.
 export default function FinancesScreen() {
-  const { user, role } = useAuth();
-  const isOwner = hasRole(role, "owner");
+  const { user } = useAuth();
   const [period, setPeriod] = useState("today");
 
   const { toasts, showToast, dismissToast } = useToasts();
   const { data: categories, isError: catError } = useExpenseCategories();
   const { data: entries, isLoading, isError } = useCashbook();
-  const { data: pnl, isLoading: pnlLoading } = usePnl(period, { enabled: isOwner });
+  // P&L relaxed to manager+ in step 8f (§7C.4) — same gate as the whole
+  // screen, so it always loads for whoever reaches here.
+  const { data: pnl, isLoading: pnlLoading } = usePnl(period);
 
   const seedDefaults = useSeedDefaultCategories();
 
@@ -94,12 +94,7 @@ export default function FinancesScreen() {
               </div>
             </div>
 
-            {isOwner && <PnLPanel pnl={pnl} isLoading={pnlLoading} />}
-            {!isOwner && (
-              <div className="fin-hint">
-                The net-profit summary is visible to the owner. You can still record and review expenses below.
-              </div>
-            )}
+            <PnLPanel pnl={pnl} isLoading={pnlLoading} />
 
             <div className="fin-columns">
               <RecordEntryForm

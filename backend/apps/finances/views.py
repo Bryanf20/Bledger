@@ -15,7 +15,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.permissions import IsManagerOrOwner, IsOwner
+from apps.activity.services import log_activity
+from apps.core.permissions import IsManagerOrOwner
 from apps.dashboard.services import period_range, resolve_period
 from apps.sync.models import OutboxEntry
 from apps.sync.utils import write_outbox_entry
@@ -83,26 +84,55 @@ class CashbookEntryViewSet(BranchScopedQuerysetMixin, viewsets.ModelViewSet):
             branch_id=self.request.branch_id, recorded_by=self.request.user
         )
         write_outbox_entry(instance=instance, operation=OutboxEntry.INSERT)
+        verb = "expense" if instance.direction == CashbookEntry.EXPENSE else "income"
+        log_activity(
+            self.request,
+            action="expense.record",
+            summary=f"Recorded {verb} of {instance.amount:,} XAF"
+            + (f" ({instance.category.name})" if instance.category else ""),
+            target=instance,
+            metadata={"amount": instance.amount, "direction": instance.direction},
+        )
 
     def perform_update(self, serializer):
         instance = serializer.save()
         write_outbox_entry(instance=instance, operation=OutboxEntry.UPDATE)
+        log_activity(
+            self.request,
+            action="expense.edit",
+            summary=f"Edited cashbook entry to {instance.amount:,} XAF",
+            target=instance,
+            metadata={"amount": instance.amount},
+        )
 
     def perform_destroy(self, instance):
         # Soft delete + a DELETE tombstone for the cloud, same as the
         # catalogue's soft-deletes.
         instance.soft_delete()
         write_outbox_entry(instance=instance, operation=OutboxEntry.DELETE)
+        log_activity(
+            self.request,
+            action="expense.delete",
+            summary=f"Deleted cashbook entry of {instance.amount:,} XAF",
+            target=instance,
+            metadata={"amount": instance.amount},
+        )
 
 
 class PnLView(APIView):
     """
     GET /api/v1/finances/pnl/?period=today|week|month — the period
     profit-and-loss (§7B.3): gross margin − expenses + income = net
-    profit, plus the expense-by-category breakdown. Owner-only.
+    profit, plus the expense-by-category breakdown.
+
+    Manager+ (§7C.4): every other dashboard financial (gross margin,
+    COGS, stock valuation) is already manager-visible, so net profit —
+    which is just gross margin minus expenses — is too, rather than being
+    the one owner-only number. Relaxed from the original owner-only in
+    step 8f so the dashboard can show one honest bottom line.
     """
 
-    permission_classes = [IsOwner]
+    permission_classes = [IsManagerOrOwner]
 
     def get(self, request):
         period = resolve_period(request.query_params.get("period"))
