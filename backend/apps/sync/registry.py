@@ -33,6 +33,7 @@ SYNCED_TABLES = {
     "inventory_product": 1,
     "inventory_branchpriceoverride": 1,
     "inventory_stockadjustment": 1,
+    "inventory_productpricehistory": 1,
     "sales_sale": 1,
     "sales_salelineitem": 1,
     "suppliers_supplier": 1,

@@ -33,6 +33,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.inventory.models import Product
+from apps.inventory.services import weighted_average_cost
 from apps.sync.models import OutboxEntry
 from apps.sync.utils import write_outbox_entry
 
@@ -69,12 +70,16 @@ class SupplierSerializer(serializers.ModelSerializer):
 
 
 class PurchaseLineItemSerializer(serializers.ModelSerializer):
-    product_name = serializers.CharField(source="product.name", read_only=True)
+    # Snapshotted name (§7A.1) with a fallback for pre-snapshot rows.
+    product_name = serializers.SerializerMethodField()
 
     class Meta:
         model = PurchaseLineItem
         fields = ["id", "product", "product_name", "quantity", "unit_cost", "line_total"]
         read_only_fields = fields
+
+    def get_product_name(self, obj):
+        return obj.product_name or obj.product.name
 
 
 class PurchaseLineItemInputSerializer(serializers.Serializer):
@@ -187,19 +192,46 @@ class PurchaseSerializer(serializers.ModelSerializer):
             )
 
             for payload in line_items_payload:
+                product = payload["product"]
                 PurchaseLineItem.objects.create(
                     branch_id=branch_id,
                     purchase=purchase,
-                    product=payload["product"],
+                    product=product,
+                    # Snapshot the name at purchase time (§7A.1).
+                    product_name=product.name,
                     quantity=payload["quantity"],
                     unit_cost=payload["unit_cost"],
                     line_total=payload["line_total"],
                 )
+                # Recompute weighted-average cost (§7A.5) using the
+                # pre-purchase stock and average — must happen BEFORE
+                # stock_level becomes an F() expression below. A purchase
+                # is the one event that establishes/moves cost, so it also
+                # records last_cost and flips cost_is_set on.
+                #
+                # If the product had no cost basis yet (cost_is_set=False),
+                # this purchase ESTABLISHES it: the incoming cost becomes
+                # the average outright. Blending against the phantom
+                # average_cost=0 of existing unknown-cost stock would
+                # understate it badly (50 opening units + 50 bought at
+                # 3800 would read 1900, not 3800).
+                if not product.cost_is_set:
+                    product.average_cost = payload["unit_cost"]
+                else:
+                    product.average_cost = weighted_average_cost(
+                        product.stock_level, product.average_cost,
+                        payload["quantity"], payload["unit_cost"],
+                    )
+                product.last_cost = payload["unit_cost"]
+                product.cost_is_set = True
                 # updated_at/version included so the product row's
                 # optimistic-concurrency fields move with every stock
                 # write — same trio as StockAdjustmentSerializer.create().
-                payload["product"].stock_level = F("stock_level") + payload["quantity"]
-                payload["product"].save(update_fields=["stock_level", "updated_at", "version"])
+                product.stock_level = F("stock_level") + payload["quantity"]
+                product.save(update_fields=[
+                    "stock_level", "average_cost", "last_cost", "cost_is_set",
+                    "updated_at", "version",
+                ])
 
             # The amount paid at the moment of recording IS a payment --
             # give it its own PurchasePayment row so the ledger is

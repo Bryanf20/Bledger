@@ -36,6 +36,11 @@ export default function ProductFormPanel({ mode, product, categories, onClose, o
       category: product?.category ?? "",
       unit: product?.unit ?? "unit",
       retail_price: product?.retail_price ?? "",
+      // Cost basis (§7A). Prefilled from the product's current
+      // average_cost when known; left blank when cost isn't set, so an
+      // owner can enter the opening cost. Blank on submit means "don't
+      // change it" — normally cost comes from purchases.
+      average_cost: product?.cost_is_set ? product.average_cost : "",
       barcode: product?.barcode ?? "",
       low_stock_threshold: product?.low_stock_threshold ?? 5,
       has_bulk: Boolean(product?.bulk_price && product?.bulk_min_qty),
@@ -72,6 +77,14 @@ export default function ProductFormPanel({ mode, product, categories, onClose, o
       bulk_price: values.has_bulk ? Number(values.bulk_price) : null,
       bulk_min_qty: values.has_bulk ? Number(values.bulk_min_qty) : null,
     };
+
+    // Only send average_cost when the owner actually entered one — an
+    // empty field means "leave cost as-is" (purchases normally drive it),
+    // never "set cost to 0".
+    const costEntered = String(values.average_cost).trim();
+    if (costEntered !== "") {
+      payload.average_cost = Number(costEntered);
+    }
 
     try {
       if (isEdit) {
@@ -209,15 +222,38 @@ export default function ProductFormPanel({ mode, product, categories, onClose, o
             )}
 
             <div>
+              <label className="inv-field-label" htmlFor="average_cost">
+                Cost price (XAF) <span className="inv-field-hint">(optional — usually set by purchases)</span>
+              </label>
+              <input
+                id="average_cost"
+                type="number"
+                min="0"
+                className="inv-field-input"
+                placeholder="What this costs you per unit — leave blank if unknown"
+                {...register("average_cost")}
+              />
+              {errors.average_cost && <div className="inv-field-error">{errors.average_cost.message}</div>}
+            </div>
+
+            <div>
               <label className="inv-field-label" htmlFor="barcode">
                 Barcode <span className="inv-field-hint">(optional — scan or type)</span>
               </label>
               <input
                 id="barcode"
                 className="inv-field-input"
-                placeholder="Leave blank for goods with no barcode"
+                placeholder="Scan the item here, or type — leave blank if it has no barcode"
                 autoComplete="off"
                 {...register("barcode")}
+                onKeyDown={(e) => {
+                  // A USB scanner finishes its transmission with Enter.
+                  // Without this, that Enter would submit the whole
+                  // product form — usually before name/price are filled.
+                  // Swallow it so scanning just fills this field; the
+                  // user submits deliberately with the button.
+                  if (e.key === "Enter") e.preventDefault();
+                }}
               />
               {errors.barcode && <div className="inv-field-error">{errors.barcode.message}</div>}
             </div>

@@ -46,10 +46,18 @@ class ProductSerializer(serializers.ModelSerializer):
             "retail_price", "bulk_price", "bulk_min_qty",
             "stock_level", "low_stock_threshold", "stock_status",
             "is_active", "source", "barcode",
+            # Cost basis (§7A). average_cost is writable (manager+ only,
+            # like the rest of product editing) so an owner can seed the
+            # cost of opening stock or correct it; normally it's driven by
+            # purchases. cost_is_set / last_cost are server-maintained.
+            "average_cost", "cost_is_set", "last_cost",
             "effective_retail_price", "effective_bulk_price",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["id", "stock_level", "source", "created_at", "updated_at"]
+        read_only_fields = [
+            "id", "stock_level", "source", "cost_is_set", "last_cost",
+            "created_at", "updated_at",
+        ]
 
     def validate_barcode(self, value):
         # Empty is always fine (barcode is optional — see the model).
@@ -188,6 +196,11 @@ class StockAdjustmentSerializer(serializers.ModelSerializer):
                 stock_before=stock_before,
                 stock_after=stock_after,
             )
+            # A stock adjustment deliberately does NOT touch average_cost
+            # (Phase 2 design §7A.5): removing units doesn't change what
+            # the rest cost, and an "add"/"correction" carries no cost, so
+            # the added units simply inherit the current average. Only a
+            # purchase (and void restoration) moves the cost basis.
             locked_product.stock_level = stock_after
             locked_product.save(update_fields=["stock_level", "updated_at", "version"])
  

@@ -26,6 +26,27 @@ function lineFor(product, quantity) {
     bulkApplied,
     lineTotal: unitPrice * quantity,
     stockLevel: product.stock_level,
+    isBrokered: false,
+  };
+}
+
+// A brokered line (Phase 2 §7B.1): the item is sourced externally, so it
+// carries no stock ceiling. It sells at the catalogue retail price and
+// records the external cost + source note, which the sale POST forwards
+// as is_brokered / external_cost / source_note.
+function brokeredLineFor(product, quantity, externalCost, sourceNote) {
+  const unitPrice = product.effective_retail_price;
+  return {
+    productId: product.id,
+    name: product.name,
+    quantity,
+    unitPrice,
+    bulkApplied: false,
+    lineTotal: unitPrice * quantity,
+    stockLevel: product.stock_level,
+    isBrokered: true,
+    externalCost,
+    sourceNote: sourceNote ?? "",
   };
 }
 
@@ -44,9 +65,36 @@ export const useCartStore = create((set, get) => ({
     }));
   },
 
+  // Adds (or replaces) a brokered line for a product, bypassing the
+  // stock ceiling — the item isn't in inventory.
+  addBrokeredItem: (product, { quantity = 1, externalCost, sourceNote } = {}) => {
+    const line = brokeredLineFor(product, quantity, externalCost, sourceNote);
+    set((state) => {
+      const exists = state.items.some((i) => i.productId === product.id);
+      return {
+        items: exists
+          ? state.items.map((i) => (i.productId === product.id ? line : i))
+          : [...state.items, line],
+      };
+    });
+  },
+
   setQuantity: (productId, quantity, product) => {
     if (quantity <= 0) {
       set((state) => ({ items: state.items.filter((i) => i.productId !== productId) }));
+      return;
+    }
+    const existing = get().items.find((i) => i.productId === productId);
+    // A brokered line has no stock ceiling; preserve its external cost
+    // and source note when its quantity changes.
+    if (existing?.isBrokered) {
+      set((state) => ({
+        items: state.items.map((i) =>
+          i.productId === productId
+            ? brokeredLineFor(product, quantity, existing.externalCost, existing.sourceNote)
+            : i,
+        ),
+      }));
       return;
     }
     if (quantity > product.stock_level) return;
@@ -67,9 +115,12 @@ export const useCartStore = create((set, get) => ({
   restoreFrom: (cartData, products) => {
     const byId = new Map(products.map((p) => [p.id, p]));
     const items = (cartData?.items ?? [])
-      .map(({ product: productId, quantity }) => {
+      .map(({ product: productId, quantity, is_brokered, external_cost, source_note }) => {
         const product = byId.get(productId);
-        return product ? lineFor(product, quantity) : null;
+        if (!product) return null;
+        return is_brokered
+          ? brokeredLineFor(product, quantity, external_cost, source_note)
+          : lineFor(product, quantity);
       })
       .filter(Boolean);
     set({ items });

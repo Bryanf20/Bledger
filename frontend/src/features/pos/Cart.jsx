@@ -24,6 +24,7 @@ export default function Cart({ productsById }) {
               <div className="pos-cart-name">
                 {item.name}
                 {item.bulkApplied && <span className="pos-prod-bulk"> · bulk</span>}
+                {item.isBrokered && <span className="pos-brokered-tag"> · sourced</span>}
               </div>
               <div className="pos-qty-ctrl">
                 <button
@@ -38,7 +39,7 @@ export default function Cart({ productsById }) {
                   type="button"
                   className="pos-qty-btn"
                   onClick={() => setQuantity(item.productId, item.quantity + 1, product)}
-                  disabled={item.quantity >= item.stockLevel}
+                  disabled={!item.isBrokered && item.quantity >= item.stockLevel}
                 >
                   +
                 </button>

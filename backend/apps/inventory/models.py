@@ -107,6 +107,22 @@ class Product(BaseModel):
     # products may have no barcode.
     barcode = models.CharField(max_length=64, blank=True, default="", db_index=True)
 
+    # --- Cost basis (Phase 2 design §7A) --------------------------------
+    # Weighted-average cost per unit, in XAF. Server-maintained: recomputed
+    # on every purchase (WAC) and on void restoration. It is NOT moved by
+    # sales or stock adjustments — removing units doesn't change what the
+    # remaining ones cost. Drives cost-of-goods-sold and margin reporting.
+    average_cost = models.PositiveIntegerField(default=0)
+    # False until a real cost basis exists (a purchase, a migration
+    # backfill from purchase history, or an explicit owner entry).
+    # Distinguishes "costs 0" from "cost unknown", so a product with no
+    # basis is excluded from margin reporting rather than reporting a
+    # false 100%% margin (§7A.8).
+    cost_is_set = models.BooleanField(default=False)
+    # Most recent purchase unit cost, for "your cost went up" comparisons
+    # (§7A.6). Null until the first purchase or backfill.
+    last_cost = models.PositiveIntegerField(null=True, blank=True)
+
     class Meta:
         ordering = ["name"]
         constraints = [
@@ -189,6 +205,34 @@ class StockAdjustment(BaseModel):
 
     def __str__(self):
         return f"{self.product.name}: {self.quantity:+d} ({self.adjustment_type})"
+
+
+class ProductPriceHistory(BaseModel):
+    """
+    Append-only log of a product's price changes (Phase 2 design §7A.1):
+    who set which retail/bulk pricing, and when (created_at is the
+    effective-from moment). A row is written on product creation (the
+    opening price) and on every later change to retail_price, bulk_price,
+    or bulk_min_qty. Never updated or deleted — same audit-trail principle
+    as StockAdjustment, and the reason "what was this priced at in March?"
+    is answerable even for periods when nothing sold.
+    """
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="price_history")
+    retail_price = models.PositiveIntegerField()
+    bulk_price = models.PositiveIntegerField(null=True, blank=True)
+    bulk_min_qty = models.PositiveIntegerField(null=True, blank=True)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="price_changes",
+    )
+
+    class Meta(BaseModel.Meta):
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.product.name} @ {self.retail_price}"
 
 
 class ProductTemplate(models.Model):

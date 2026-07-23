@@ -1,19 +1,26 @@
 """
 Auth & first-run setup endpoints (design doc Part E.1 / E.6).
 """
+import logging
+
 from django.contrib.auth import login as django_login
 from django.contrib.auth import logout as django_logout
+from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.permissions import IsOwner
+from apps.core.permissions import IsCashierOrAbove, IsOwner
 from apps.inventory.services import TemplateNotFoundError, list_templates, load_template
 
-from django.shortcuts import get_object_or_404
-
+from .approvals import (
+    clear_failures,
+    is_locked_out,
+    issue_approval_token,
+    record_failure,
+)
 from .models import BledgerUser, Branch, BusinessSettings
 from .serializers import (
     BranchUpdateSerializer,
@@ -26,7 +33,10 @@ from .serializers import (
     StaffUserListSerializer,
     StaffUserUpdateSerializer,
     UserProfileSerializer,
+    VerifyPinSerializer,
 )
+
+logger = logging.getLogger("apps.auth_users")
 
 
 def _token_response(user, status_code=status.HTTP_200_OK):
@@ -84,6 +94,82 @@ class MeView(APIView):
 
     def get(self, request):
         return Response(UserProfileSerializer(request.user).data)
+
+
+class VerifyPinView(APIView):
+    """
+    POST /api/v1/auth/verify-pin/ — a manager authorises a cashier's
+    action by entering their username + PIN (Phase 2 design §3.2). On
+    success it returns a short-lived, purpose-scoped approval token that
+    the cashier's in-flight sale/credit request carries as proof; the
+    consuming endpoint verifies it and records the approver.
+
+    This is an authorisation check performed INSIDE the cashier's
+    session — it must never call login/logout or issue an auth token, so
+    the cashier stays logged in at the till throughout. `request.user`
+    (the cashier) is untouched.
+
+    Guards, because a 4-digit PIN over an endpoint is a brute-force
+    oracle:
+      - the target manager account locks after FAILURE_LIMIT failures in
+        a rolling window (apps.auth_users.approvals);
+      - every attempt is logged (never the PIN);
+      - all invalid cases return one uniform 401, so the endpoint doesn't
+        reveal whether a username exists or a PIN was close.
+    """
+
+    permission_classes = [IsCashierOrAbove]
+
+    # Uniform failure — deliberately does not distinguish "no such user",
+    # "wrong PIN", and "user isn't a manager", so none of them leak.
+    _INVALID = {"detail": "Invalid username or PIN, or that person can't approve this."}
+
+    def post(self, request):
+        serializer = VerifyPinSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        username = serializer.validated_data["username"]
+        pin = serializer.validated_data["pin"]
+        purpose = serializer.validated_data["purpose"]
+
+        if is_locked_out(username):
+            logger.warning("verify-pin locked out: username=%s purpose=%s", username, purpose)
+            return Response(
+                {"detail": "Too many failed attempts. Try again in a few minutes."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        try:
+            approver = BledgerUser.objects.get(username=username, is_active=True)
+        except BledgerUser.DoesNotExist:
+            approver = None
+
+        approved = (
+            approver is not None
+            and (approver.is_manager or approver.is_owner)
+            and approver.check_pin(pin)
+        )
+
+        if not approved:
+            record_failure(username)
+            logger.warning(
+                "verify-pin failed: username=%s purpose=%s by_user=%s",
+                username, purpose, getattr(request.user, "username", "?"),
+            )
+            return Response(self._INVALID, status=status.HTTP_401_UNAUTHORIZED)
+
+        clear_failures(username)
+        logger.info(
+            "verify-pin approved: approver=%s purpose=%s for_user=%s",
+            approver.username, purpose, getattr(request.user, "username", "?"),
+        )
+        return Response(
+            {
+                "approved": True,
+                "approver": {"id": str(approver.id), "name": approver.name, "role": approver.role},
+                "approval_token": issue_approval_token(approver, purpose),
+                "purpose": purpose,
+            }
+        )
 
 
 class SetupStatusView(APIView):

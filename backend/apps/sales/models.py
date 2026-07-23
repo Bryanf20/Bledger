@@ -70,7 +70,32 @@ class SaleLineItem(BaseModel):
     product = models.ForeignKey(
         "inventory.Product", on_delete=models.PROTECT, related_name="sale_line_items"
     )
+    # Snapshot of the product name at sale time (Phase 2 design §7A.1).
+    # Read on receipts and history instead of the live product.name, so
+    # renaming a product later doesn't rewrite past receipts. Blank for
+    # rows created before this field existed — callers fall back to
+    # product.name.
+    product_name = models.CharField(max_length=150, blank=True, default="")
     quantity = models.PositiveIntegerField()
+
+    # Cost of goods sold: the product's weighted-average cost at the
+    # moment of sale (Phase 2 design §7A.5). Snapshotted, exactly like
+    # the price fields, so margin history stays correct as average_cost
+    # moves. 0 for pre-cost-tracking rows and for products whose cost was
+    # never set (cost_is_set=False) — margin reporting excludes those.
+    # For a brokered line (below) this holds the EXTERNAL cost — what was
+    # paid to the outside source — instead of the product's average cost.
+    unit_cost_at_sale = models.PositiveIntegerField(default=0)
+
+    # Brokered / commission sale (Phase 2 design §7B.1): the shop didn't
+    # have the item and sourced it from an outside seller at delivery
+    # time, marking it up. Such a line moves NO stock (the item never
+    # entered this shop's inventory) and its unit_cost_at_sale is the
+    # external purchase cost, so its margin (price - external cost) still
+    # flows into profit like any other line. source_note records who it
+    # was sourced from.
+    is_brokered = models.BooleanField(default=False)
+    source_note = models.CharField(max_length=150, blank=True, default="")
 
     # Phase 2 haggling fields — catalogue_price == actual_price,
     # variance == 0, variance_approved_by == None in Phase 1

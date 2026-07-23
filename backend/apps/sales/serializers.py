@@ -5,6 +5,7 @@ from rest_framework import serializers
 
 from apps.core.utils.xaf import round_xaf
 from apps.inventory.models import Product
+from apps.inventory.services import weighted_average_cost
 from apps.sync.models import OutboxEntry
 from apps.sync.utils import write_outbox_entry
 
@@ -13,7 +14,12 @@ from .services import resolve_unit_price
 
 
 class SaleLineItemSerializer(serializers.ModelSerializer):
-    product_name = serializers.CharField(source="product.name", read_only=True)
+    # Prefer the name snapshotted at sale time (§7A.1); fall back to the
+    # live product for rows created before snapshotting existed.
+    # unit_cost_at_sale is deliberately NOT exposed here — cost is
+    # financial data cashiers don't see (same reasoning as suppliers
+    # being manager+); margin reporting (step 8) reads it server-side.
+    product_name = serializers.SerializerMethodField()
 
     class Meta:
         model = SaleLineItem
@@ -21,8 +27,15 @@ class SaleLineItemSerializer(serializers.ModelSerializer):
             "id", "product", "product_name", "quantity",
             "catalogue_price", "actual_price", "variance",
             "variance_approved_by", "line_total",
+            # is_brokered / source_note are not COGS, so they're safe to
+            # show (a cashier marked the line and wrote the note); the
+            # external cost lives in unit_cost_at_sale, which stays hidden.
+            "is_brokered", "source_note",
         ]
         read_only_fields = fields
+
+    def get_product_name(self, obj):
+        return obj.product_name or obj.product.name
 
 
 class SaleLineItemInputSerializer(serializers.Serializer):
@@ -30,6 +43,21 @@ class SaleLineItemInputSerializer(serializers.Serializer):
 
     product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
     quantity = serializers.IntegerField(min_value=1)
+    # Brokered line (§7B.1): sourced externally, moves no stock. When set,
+    # external_cost (what was paid the outside source) is required and is
+    # recorded as the line's cost-of-goods-sold.
+    is_brokered = serializers.BooleanField(required=False, default=False)
+    external_cost = serializers.IntegerField(min_value=0, required=False)
+    source_note = serializers.CharField(
+        max_length=150, required=False, allow_blank=True, default=""
+    )
+
+    def validate(self, attrs):
+        if attrs.get("is_brokered") and attrs.get("external_cost") is None:
+            raise serializers.ValidationError(
+                {"external_cost": "Enter what you paid the source for a brokered item."}
+            )
+        return attrs
 
 
 class SaleSerializer(serializers.ModelSerializer):
@@ -121,20 +149,28 @@ class SaleSerializer(serializers.ModelSerializer):
             subtotal = 0
 
             for item in items_data:
-                # select_for_update — same locking pattern as
-                # inventory's StockAdjustmentSerializer.create().
-                product = Product.objects.select_for_update().get(pk=item["product"].pk)
                 quantity = item["quantity"]
+                is_brokered = item.get("is_brokered", False)
 
-                if product.stock_level < quantity:
-                    raise serializers.ValidationError(
-                        {
-                            "items": (
-                                f"Insufficient stock for {product.name} "
-                                f"(have {product.stock_level}, need {quantity})."
-                            )
-                        }
-                    )
+                if is_brokered:
+                    # Sourced externally — the item never entered this
+                    # shop's inventory, so no stock check and no lock (we
+                    # won't write the product row). It stays referenced for
+                    # its name and catalogue price.
+                    product = Product.objects.get(pk=item["product"].pk)
+                else:
+                    # select_for_update — same locking pattern as
+                    # inventory's StockAdjustmentSerializer.create().
+                    product = Product.objects.select_for_update().get(pk=item["product"].pk)
+                    if product.stock_level < quantity:
+                        raise serializers.ValidationError(
+                            {
+                                "items": (
+                                    f"Insufficient stock for {product.name} "
+                                    f"(have {product.stock_level}, need {quantity})."
+                                )
+                            }
+                        )
 
                 unit_price = resolve_unit_price(product, branch_id, quantity)
                 line_total = round_xaf(unit_price * quantity)
@@ -145,6 +181,9 @@ class SaleSerializer(serializers.ModelSerializer):
                         "quantity": quantity,
                         "unit_price": unit_price,
                         "line_total": line_total,
+                        "is_brokered": is_brokered,
+                        "external_cost": item.get("external_cost", 0),
+                        "source_note": item.get("source_note", ""),
                     }
                 )
                 subtotal += line_total
@@ -169,21 +208,38 @@ class SaleSerializer(serializers.ModelSerializer):
             )
 
             for payload in line_items_payload:
+                product = payload["product"]
+                is_brokered = payload["is_brokered"]
                 SaleLineItem.objects.create(
                     branch_id=branch_id,
                     sale=sale,
-                    product=payload["product"],
+                    product=product,
+                    # Snapshot name (§7A.1) and cost-of-goods-sold (§7A.5)
+                    # at sale time, exactly as the price fields are
+                    # snapshotted, so history stays correct as the product
+                    # is renamed or its average cost moves. For a brokered
+                    # line the COGS is the external cost paid to the source
+                    # (§7B.1); otherwise it's the product's average cost
+                    # (0 when never set — reporting treats that as unknown).
+                    product_name=product.name,
                     quantity=payload["quantity"],
                     catalogue_price=payload["unit_price"],
                     actual_price=payload["unit_price"],
                     variance=0,
+                    unit_cost_at_sale=(
+                        payload["external_cost"] if is_brokered else product.average_cost
+                    ),
+                    is_brokered=is_brokered,
+                    source_note=payload["source_note"],
                     line_total=payload["line_total"],
                 )
-                # updated_at/version included so the product row's
-                # optimistic-concurrency fields move with every stock
-                # write — same trio as StockAdjustmentSerializer.create().
-                payload["product"].stock_level = F("stock_level") - payload["quantity"]
-                payload["product"].save(update_fields=["stock_level", "updated_at", "version"])
+                # A brokered line moves no stock — the item never entered
+                # inventory. A normal sale decrements stock; selling does
+                # NOT change average_cost (removing units at the average
+                # leaves the rest costing the same).
+                if not is_brokered:
+                    product.stock_level = F("stock_level") - payload["quantity"]
+                    product.save(update_fields=["stock_level", "updated_at", "version"])
 
             write_outbox_entry(instance=sale, operation=OutboxEntry.INSERT, branch_id=branch_id)
 
@@ -203,13 +259,38 @@ class VoidSaleSerializer(serializers.Serializer):
 
         with transaction.atomic():
             for line_item in sale.line_items.select_related("product"):
+                # A brokered line never moved stock and was never part of
+                # inventory (§7B.1), so voiding it must NOT restore stock
+                # or recompute average_cost — doing so would invent
+                # phantom units and corrupt the cost basis. Skip it
+                # entirely; the sale row itself still flips to VOIDED below.
+                if line_item.is_brokered:
+                    continue
+
                 # Instance save(), not queryset .update() — .update()
                 # bypasses BaseModel.save(), so version/updated_at
                 # wouldn't move with the stock write like they do at
                 # every other stock-mutation site.
                 locked_product = Product.objects.select_for_update().get(pk=line_item.product_id)
+
+                # Restore the cost basis "as if the sale never happened":
+                # the units return at the cost they left at
+                # (unit_cost_at_sale), and the average is recomputed over
+                # the restored total. Using the *current* average instead
+                # would let a void after an intervening purchase — which
+                # moved the average — drift it on every void/resell cycle
+                # (§7A.5). A 0 snapshot (pre-cost-tracking sale, or a
+                # cost-unknown product) means "no basis to restore", so
+                # leave the average untouched and just add the stock back.
+                if line_item.unit_cost_at_sale > 0:
+                    locked_product.average_cost = weighted_average_cost(
+                        locked_product.stock_level, locked_product.average_cost,
+                        line_item.quantity, line_item.unit_cost_at_sale,
+                    )
                 locked_product.stock_level = F("stock_level") + line_item.quantity
-                locked_product.save(update_fields=["stock_level", "updated_at", "version"])
+                locked_product.save(update_fields=[
+                    "stock_level", "average_cost", "updated_at", "version",
+                ])
 
             sale.status = Sale.VOIDED
             sale.voided_by = request.user

@@ -91,6 +91,11 @@ class Purchase(BaseModel):
 class PurchaseLineItem(BaseModel):
     purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name="line_items")
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="purchase_line_items")
+    # Snapshot of the product name at purchase time (Phase 2 design
+    # §7A.1), so a later rename doesn't rewrite historical purchase
+    # records. Blank for pre-existing rows — callers fall back to
+    # product.name.
+    product_name = models.CharField(max_length=150, blank=True, default="")
     quantity = models.PositiveIntegerField()
     unit_cost = models.PositiveIntegerField()
     line_total = models.PositiveIntegerField()

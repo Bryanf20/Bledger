@@ -90,6 +90,29 @@
   color: var(--color-text-success);
   background: var(--color-background-success);
 }
+
+/* Brokered (sourced) sale bits (Phase 2 §7B.1). */
+.pos-brokered-tag {
+  font-size: 11px;
+  color: var(--color-text-info);
+}
+.pos-brokered-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin: 8px 0 4px;
+  text-align: left;
+}
+.pos-brokered-gain {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-success);
+  margin-top: 8px;
+}
+.pos-brokered-gain.loss {
+  color: var(--color-text-danger);
+}
 .pos-held-btn {
   border-color: #ef9f27;
   color: var(--color-text-warning);

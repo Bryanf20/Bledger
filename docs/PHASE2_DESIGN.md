@@ -15,7 +15,7 @@ Sections are marked by how much prior commitment exists:
 - **[DOC]** — specified in `Bledger_Feasibility_Design_v0.3` or `Bledger_Design_v0.5`. Design here follows that spec.
 - **[PROPOSED]** — the design docs list the module as Phase 2 but give only a one-line description. Everything here is a proposal for your review, not a committed decision.
 
-Workstream A (sync) and B (negotiated pricing) are largely **[DOC]**. Workstreams C–G are largely **[PROPOSED]**. Workstream G has no doc grounding at all — it was identified by review during Phase 2 design and is included because its absence blocks any profit reporting.
+Workstream A (sync) and B (negotiated pricing) are largely **[DOC]**. Workstreams C–H are largely **[PROPOSED]**. Workstreams G and H have no doc grounding — both were identified by review during Phase 2. G's absence blocks any profit reporting; H's absence means the system tracks gross margin but never *net* profit (it can't see expenses).
 
 ---
 
@@ -30,6 +30,7 @@ Workstream A (sync) and B (negotiated pricing) are largely **[DOC]**. Workstream
 | **E** | Purchase orders & supplier payments | [PROPOSED] | Suppliers module (stable) |
 | **F** | Settings module | [PROPOSED] | Touches all of the above |
 | **G** | Cost tracking & profitability | [PROPOSED] | Inventory + suppliers (stable) |
+| **H** | Finances & cashbook (expenses, net profit, brokered sales) | [PROPOSED] | Cost tracking (G) |
 
 Three principles carry through every workstream:
 
@@ -188,6 +189,17 @@ Without step 5 the entire control is decorative — a modified client could send
 New dashboard endpoints: total surplus per period, total discounts per period, net variance, per-cashier breakdown, and end-of-day reconciliation (expected cash = Σ catalogue prices vs actual cash = Σ actual prices).
 
 The per-cashier breakdown is the fraud-detection surface and should be prominent for owners. A cashier consistently discounting to the floor deserves a look.
+
+### 3.5 Implementation notes — PIN-approval primitive (Stage 2, step 4 — ✅ done)
+
+The approval *mechanism* (§3.2) is built ahead of the pricing UI (§3.1) and credit (§4) that consume it, since both need the same primitive. What landed:
+
+- **`POST /api/v1/auth/verify-pin/`** (`apps/auth_users/views.py`) — a manager authorises a cashier's action with **username + PIN**, not PIN alone. This is a deliberate strengthening over §3.2's "returning whether the PIN belongs to a manager-or-above": a bare 4-digit PIN is ambiguous about *who* approved (needed for `variance_approved_by`) and requiring a known username also shrinks the brute-force surface. Any authenticated staff member (the cashier) may call it; it verifies the *named* account is manager-or-owner and the PIN matches.
+- **Never touches the caller's session.** No `login`/`logout`, no token issued for the cashier — approval is an authorisation check inside the cashier's own session, so they stay logged in at the till (tested).
+- **Approval token** (`apps/auth_users/approvals.py`) — on success the endpoint returns a `django.core.signing`-signed, 120-second, **purpose-scoped** token (`price_variance` / `credit_override`). Stateless (no DB row, no cleanup), and a token minted for one purpose can't unlock another. The consuming endpoints (steps 5 and 7) will call `verify_approval_token(token, purpose=...)`, resolve the approver, and record them.
+- **Brute-force lockout** — the *target account* locks after 5 failed attempts in a rolling 5-minute window (cache-backed), so even the correct PIN then returns 429; this is the control the design named explicitly. Every attempt is logged (never the PIN). All invalid cases — unknown user, wrong PIN, non-manager — return one **uniform 401**, so the endpoint is not a username or role oracle.
+- **Note on scale:** the lockout counter uses get-then-set on the default `LocMemCache`, which is atomic enough for the single-process standalone/branch deployment; a shared cache with atomic `incr` is the upgrade if this ever runs multi-process. A DRF per-requester throttle could layer on top but wasn't needed for the named threat.
+- No model changes, no migration. Tests: `apps/auth_users/tests/test_verify_pin.py` (14).
 
 ---
 
@@ -469,6 +481,110 @@ New dashboard capability, all derivable once the above exists:
 
 Historical `unit_cost_at_sale` cannot be reconstructed and stays 0; margin reporting should therefore start from the deployment date rather than claiming to cover past sales.
 
+### 7A.9 Implementation notes (Stage 2, step 5 — ✅ done)
+
+The data model and capture logic landed; the margin/valuation *reporting* is step 8.
+
+- **Model** — `Product` gained `average_cost`, `cost_is_set`, `last_cost`. `SaleLineItem` gained `unit_cost_at_sale` and `product_name`; `PurchaseLineItem` gained `product_name`. New `ProductPriceHistory(BaseModel)` (registered `SYNCED`, writes outbox entries like `StockAdjustment`). `cost_is_set` is a real boolean rather than a sentinel 0, so "costs 0" and "cost unknown" are distinguishable.
+- **WAC on purchase** (`suppliers/serializers.py`) — recomputed per line inside the existing locked transaction, before `stock_level` becomes an `F()`. **A first purchase of a cost-unknown product *establishes* the basis** (incoming cost becomes the average) rather than blending against the phantom `average_cost=0` of opening stock — a subtlety found while writing tests; blending would read 50 opening + 50 @ 3800 as 1900, not 3800.
+- **COGS snapshot on sale** — `unit_cost_at_sale = product.average_cost` at sale time, alongside the name snapshot; selling never moves the average. **COGS is not exposed on the cashier-facing sale serializer** (cost is manager+ financial data); step 8 reporting reads it server-side.
+- **Void is drift-safe** — restoring stock recomputes the average using each line's `unit_cost_at_sale`, so a void after an intervening purchase returns the average to "as if the sale never happened" (20@3000, sell 5, buy 30@3500 → 3333, void → 3300). A 0-COGS line (cost-unknown product) skips the recompute. This is the §7A.5 correctness point, with a dedicated test.
+- **Stock adjustments never move cost** (`add`/`remove`/`correction`) — documented at the call site so it isn't "fixed" later.
+- **Price history** — a row on product creation (opening price) and on every later change to retail/bulk pricing, recording `changed_by`; non-price edits append nothing.
+- **Manual cost** — `average_cost` is writable (manager+, like all product edits) so an owner can seed opening cost or correct a flagged product (§7A.8); providing it flips `cost_is_set`. A cost field was added to the product form (blank = "leave as-is", never "set to 0").
+- **Backfill** — `inventory/0006_backfill_average_cost` (data migration, depends on suppliers) sets `average_cost`/`last_cost`/`cost_is_set` from existing purchase history; products with none stay `cost_is_set=False`. Verified against a seeded DB. Historical `unit_cost_at_sale` stays 0 (unreconstructable), so margin reporting begins at deployment.
+- **No schema-version bump** for the changed `product`/`sale`/`purchase` payloads — same reasoning as barcode (no cloud has consumed v1 yet). `ProductPriceHistory` is a new `SYNCED` table at v1.
+- Tests: `inventory/tests/test_cost_tracking.py`, `sales/tests/test_cost_tracking.py`, `suppliers/tests/test_cost_tracking.py` (22 total). Full suite green except the pre-existing WeasyPrint printing tests.
+
+---
+
+## 7B. Workstream H — Finances & cashbook **[PROPOSED]**
+
+No doc grounding — identified in Phase 2. Cost tracking (G) gives **gross** margin (revenue − cost of goods sold). It knows nothing about the money that turns gross margin into what the owner actually keeps: rent, transport, salaries, utilities, stock written off as damaged, the fuel to go fetch a neighbour's item. **Net profit = gross margin − operating expenses (+ occasional non-sale income).** Without an expense side, the dashboard can show a healthy margin while the business quietly loses money.
+
+This is deliberately a lightweight single-entry cashbook, not double-entry accounting — OHADA statements remain Phase 4. The cashbook data is the raw material OHADA will later formalise, so this is a stepping stone, not a duplicate.
+
+Two parts: brokered sales (H.1) and the expense cashbook (H.2).
+
+### 7B.1 Brokered / commission sales
+
+A common Cameroonian practice: a vendor claims to have an item they don't, and when it's time to deliver, sources it from a neighbour and sells at a markup, pocketing the difference. That difference is real profit and currently invisible — the item was never in the vendor's stock, so a normal sale can't represent it (the stock check blocks it).
+
+**Decision (this session): capture it as a special sale line, not a bare finance entry.** A brokered sale *is* a sale — the customer pays, may want a receipt, and it should be attributed to the cashier. And its gain is simply its margin, which the Step 5 COGS machinery already computes. Recording it only as "brokerage income" in the cashbook would lose the receipt and attribution and risk double-counting.
+
+Model change — extend `SaleLineItem`:
+
+```
+SaleLineItem  + is_brokered      BooleanField, default False
+              + source_note      CharField, blank  (who it was sourced from)
+```
+
+A brokered line reuses the existing `unit_cost_at_sale` for **the external cost** (what you paid the source) rather than the product's `average_cost`. Server behaviour when `is_brokered`:
+
+- **Skip the stock-sufficiency check** and **move no stock** — the item never entered your inventory.
+- `unit_cost_at_sale` = the external cost entered at sale time.
+- Everything else is identical to a normal line, so the gain (`actual_price − unit_cost_at_sale`) flows into gross margin and per-cashier profit automatically.
+
+The line still references a catalogued `Product` (kept non-null for naming/reporting). The common case is a product you *do* sell but happen to be out of, so it's already in the catalogue; for a genuinely one-off item the owner adds a lightweight product first. **Open sub-decision:** whether to allow a fully ad-hoc brokered line (nullable product + free-text description) is deferred — it's a bigger change (nullable product ripples through reporting) and the catalogue path covers the common case.
+
+POS: a per-line "sell without stock (sourced)" action that prompts for the external cost and an optional source note, and marks the line brokered. Because cost is manager-adjacent, whether a cashier may enter the external cost or it needs the §3.2 PIN approval is a small policy choice — recommend allowing cashiers (they already see retail prices; the external cost is theirs to enter at point of sale), with the gain visible to managers in reporting.
+
+**Implementation notes (Stage 2, step 5b — ✅ done):**
+
+- **Model** — `SaleLineItem` gained `is_brokered` and `source_note`; `unit_cost_at_sale` (added in step 5) doubles as the external cost for brokered lines. Migration `sales/0004_salelineitem_brokered`.
+- **Sale path** — the write-side line serializer accepts `is_brokered` / `external_cost` (required when brokered) / `source_note`. A brokered line skips the stock check, takes no `select_for_update` lock, and **moves no stock**; its COGS is the external cost, so its gain (catalogue price − external cost) flows into margin like any other line. Selling price is the catalogue/branch price for now; custom per-line pricing arrives with negotiated pricing (step 6) and will then apply to brokered lines too.
+- **Void is brokered-aware** — a brokered line never moved stock, so `VoidSaleSerializer` skips it entirely (no stock restore, no cost recompute); voiding it would otherwise invent phantom units and corrupt the average. Tested, including a mixed normal+brokered sale where only the normal line's stock is restored.
+- **Read exposure** — `is_brokered` and `source_note` are on the sale-line serializer; the external cost stays hidden in `unit_cost_at_sale` (financial, manager-only).
+- **Frontend** — tapping an out-of-stock product in the POS grid (previously a dead, disabled card) opens a "sell sourced item" form (quantity, external cost, optional source note, with a live gain/loss preview); the brokered line joins the cart with a "· sourced" tag and no stock ceiling. Hold/restore and the sale POST carry the brokered fields. **Decision applied:** cashiers may enter the external cost (open decision #7).
+- **Policy chosen:** catalogue-only brokered items for v1 (a brokered line still references a `Product`); fully ad-hoc free-text items remain open decision #6.
+- Tests: `sales/tests/test_brokered_sales.py` (7). Full suite green except the pre-existing WeasyPrint tests. Frontend esbuild-validated, not `npm run build`-tested.
+
+### 7B.2 Expense cashbook
+
+```
+ExpenseCategory(BaseModel)     branch-owned, like inventory.Category
+  name, is_active
+  (seeded with common ones: Rent, Transport, Salaries, Utilities,
+   Supplies, Losses/Damage, Other)
+
+CashbookEntry(BaseModel)
+  direction        "expense" | "income"
+  category FK      nullable (used for expenses; income is uncategorised)
+  amount           PositiveIntegerField (XAF)
+  occurred_on      date
+  description      CharField
+  payment_method   cash | momo | other
+  recorded_by FK
+```
+
+A single ledger with a direction reads like a real cashbook (money out = expense, the rare money in = non-sale income). Expenses carry a category for the by-category breakdown; income is rare and uncategorised.
+
+**Editability differs from sales/purchases deliberately.** A sale or purchase is a customer-/supplier-facing transaction and is immutable (corrections go through void / reversing entries). An expense is the owner's own bookkeeping, where a fat-fingered amount is common and harmless to fix — so expenses are editable and soft-deletable by the owner. This is a considered exception to the "financial records are immutable" convention, not an oversight.
+
+Roles: owner (and manager) record and view expenses; the net-profit P&L is owner-only; cashiers never see finances.
+
+Sync: `ExpenseCategory` and `CashbookEntry` are branch-owned (each branch has its own rent and transport), so they sync branch→cloud like sales — registered `SYNCED`, outbox-written. No conflict with the §6 ownership model.
+
+### 7B.3 Net-profit reporting
+
+The payoff, pairing with Step 8's margin reporting:
+
+- **Gross margin** (period) = Σ over completed, non-voided sale lines of `(actual_price − unit_cost_at_sale) × quantity`, **including brokered lines**, excluding cost-unknown (0-COGS) lines.
+- **Operating expenses** (period) = Σ `CashbookEntry` expenses.
+- **Net profit** = gross margin − expenses + other income.
+- Expense-by-category breakdown, and a simple period P&L the owner can actually read.
+
+### 7B.4 Screens
+
+A new **Finances** screen (owner/manager): the cashbook list (expenses + income), an add-expense form, expense-category management, the by-category breakdown, and the period P&L. Brokered-sale entry lives at the POS (§7B.1), not here — its gain simply appears in the P&L's gross-margin line.
+
+### 7B.5 Build placement
+
+Two steps, both Stage 2:
+
+- **Brokered sales (7B.1)** — small; extends the Step 5 COGS machinery, no cloud needed. Can land right after cost tracking.
+- **Expense cashbook + net-profit view (7B.2–7B.3)** — its own step, pairs naturally with Step 8's margin reporting so the dashboard gains a single, honest bottom line.
+
 ---
 
 ## 8. Cross-cutting: schema fixes that block everything **[DOC + audit]**
@@ -539,13 +655,15 @@ These ship without any cloud, so they reach real users fast and de-risk the sche
 | # | Step | Delivers |
 |---|---|---|
 | 3 | Barcode — `Product.barcode`, USB scanner support at POS/intake (§5) | Faster till; smallest workstream — ✅ **done** |
-| 4 | PIN-approval primitive — `/auth/verify-pin/` with rate limiting (§3.2) | Shared by haggling and credit — **next** |
-| 5 | **Cost tracking (§7A)** — snapshot fixes, `ProductPriceHistory`, WAC on `Product`, COGS on sale lines, migration backfill | Profit becomes computable at all |
+| 4 | PIN-approval primitive — `/auth/verify-pin/` with rate limiting (§3.2) | Shared by haggling and credit — ✅ **done** |
+| 5 | **Cost tracking (§7A)** — snapshot fixes, `ProductPriceHistory`, WAC on `Product`, COGS on sale lines, migration backfill | Profit becomes computable at all — ✅ **done** |
+| 5b | **Brokered sales (§7B.1)** — `SaleLineItem.is_brokered`/`source_note`, no-stock sale path, external cost as COGS | Captures the neighbour-sourcing gain; small, extends step 5 — ✅ **done** |
 | 6 | Negotiated pricing (§3) — bounds config, POS price editing, server enforcement, variance reporting | The culturally-critical feature |
 | 7 | Customer accounts & credit (§4) — models, POS integration, Customers screen, aged-debt report | Removes a real blind spot in daily cash |
 | 8 | Margin & valuation reporting (§7A.6) — margin dashboard, stock valuation, margin-squeeze alerts | The owner-facing payoff of step 5 |
+| 8b | **Finances & cashbook (§7B.2–7B.3)** — `ExpenseCategory`/`CashbookEntry`, Finances screen, net-profit P&L | Gross margin becomes *net* profit; pairs with step 8 |
 
-Step 5 lands before negotiated pricing deliberately: once cost exists, the discount floor can enforce "never below cost" (§7A.7), which is a materially stronger control than a percentage-of-catalogue floor alone.
+Step 5 lands before negotiated pricing deliberately: once cost exists, the discount floor can enforce "never below cost" (§7A.7), which is a materially stronger control than a percentage-of-catalogue floor alone. Brokered sales (5b) sit right after cost tracking because they're a small extension of it. The finances cashbook (8b) pairs with margin reporting (8) so the dashboard gains one honest bottom line rather than two half-pictures.
 
 ### Stage 3 — Cloud sync & multi-branch
 
@@ -576,13 +694,15 @@ Needed before implementation starts. Roughly in order of how much they'd cost to
 
 1. **Customer credit scoping (§4.4)** — branch-scoped, shared-identity, or fully shared? Recommendation: branch-scoped. This is architectural; changing it after launch means migrating live financial data.
 2. **Is HQ a branch or a console?** `HQ_BRANCH_ID = "HQ"` is currently a magic string holding catalogue products. Does HQ also sell (a real till), or is it purely management? Determines whether `is_hq` is a flag on a normal branch or a distinct deployment.
-3. **Reference format (§8.1)** — is `BLD-BUE-2026-0001` acceptable on customer receipts? Customer-visible, so worth a look before it's baked in.
-4. **Cost backfill for existing products (§7A.8)** — products with no purchase history have no derivable cost. Confirm the approach: flag them as "cost not set" and exclude from margin reporting, rather than defaulting to 0 and reporting a false 100% margin.
-5. **Should the discount floor enforce "never below cost" (§7A.7)?** — recommended once cost exists, but it means a cashier cannot clear slow-moving stock at a loss without manager approval. That may be exactly what you want, or an obstruction.
-6. **Is the PO workflow wanted at all (§6.4)?** — or deferred to Phase 3 in favour of credit and barcode?
-5. **Existing standalone installs** — any real deployments with data that must migrate into a connected setup, or is Phase 2 greenfield? Affects migration care in §8.1.
-6. **Enrolment trust model (§2.3)** — one-time codes (friendlier) or pre-shared credentials (simpler to build)?
-7. **Cloud hosting timing** — provision Railway early (steps 8+ are hard to test without a real remote), or stay local-Docker until step 13?
+3. **Reference format (§8.1)** — is `BLD-BUE-2026-0001` acceptable on customer receipts? *(Resolved: yes, branch code in reference — implemented in Stage 1.)*
+4. **Cost backfill for existing products (§7A.8)** — flag no-history products as "cost not set" and exclude from margin reporting. *(Resolved: implemented in Stage 2 step 5.)*
+5. **Should the discount floor enforce "never below cost" (§7A.7)?** — recommended once cost exists, but it means a cashier cannot clear slow-moving stock at a loss without manager approval. That may be exactly what you want, or an obstruction. *(Needed before step 6.)*
+6. **Ad-hoc brokered items (§7B.1)** — is requiring a catalogued `Product` for every brokered sale acceptable, or do one-off items need a fully free-text line (nullable product)? Recommendation: catalogue-only for v1; revisit if one-offs prove common.
+7. **Brokered external-cost entry (§7B.1)** — may a cashier enter the external cost, or does it need §3.2 PIN approval? Recommendation: allow cashiers; the gain is visible to managers in reporting.
+8. **Is the PO workflow wanted at all (§6.4)?** — or deferred to Phase 3 in favour of credit and finances?
+9. **Existing standalone installs** — any real deployments with data that must migrate into a connected setup, or is Phase 2 greenfield? Affects migration care in §8.1.
+10. **Enrolment trust model (§2.3)** — one-time codes (friendlier) or pre-shared credentials (simpler to build)?
+11. **Cloud hosting timing** — provision Railway early (Stage 3 is hard to test without a real remote), or stay local-Docker until deployment?
 
 ---
 

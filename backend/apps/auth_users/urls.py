@@ -19,6 +19,7 @@ auth_urlpatterns = [
     path("pin-login/", views.PinLoginView.as_view(), name="auth-pin-login"),
     path("logout/", views.LogoutView.as_view(), name="auth-logout"),
     path("me/", views.MeView.as_view(), name="auth-me"),
+    path("verify-pin/", views.VerifyPinView.as_view(), name="auth-verify-pin"),
 ]
 
 setup_urlpatterns = [

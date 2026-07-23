@@ -14,7 +14,14 @@ from apps.core.permissions import IsCashierOrAbove, IsManagerOrOwner
 from apps.sync.models import OutboxEntry
 from apps.sync.utils import write_outbox_entry
 
-from .models import HQ_BRANCH_ID, BranchPriceOverride, Category, Product, StockAdjustment
+from .models import (
+    HQ_BRANCH_ID,
+    BranchPriceOverride,
+    Category,
+    Product,
+    ProductPriceHistory,
+    StockAdjustment,
+)
 from .serializers import (
     BranchPriceOverrideSerializer,
     CategorySerializer,
@@ -100,13 +107,57 @@ class ProductViewSet(BranchScopedQuerysetMixin, viewsets.ModelViewSet):
     # (perform_destroy) already wrote an entry before this change.
     def perform_create(self, serializer):
         with transaction.atomic():
-            instance = serializer.save(branch_id=self.request.branch_id, source="manual")
+            extra = {"branch_id": self.request.branch_id, "source": "manual"}
+            # An explicit average_cost at creation is a real cost basis
+            # (opening stock the owner already knows the cost of) — flag
+            # it so it isn't treated as "cost unknown" (§7A.8).
+            if "average_cost" in serializer.validated_data:
+                extra["cost_is_set"] = True
+            instance = serializer.save(**extra)
             write_outbox_entry(instance=instance, operation=OutboxEntry.INSERT)
+            # Opening price is the first row in the product's price
+            # history (§7A.1).
+            self._record_price_history(instance, previous=None)
 
     def perform_update(self, serializer):
+        # Capture the pre-save prices so we only log history on a real
+        # change (the instance still holds old values before save()).
+        before = {
+            "retail_price": serializer.instance.retail_price,
+            "bulk_price": serializer.instance.bulk_price,
+            "bulk_min_qty": serializer.instance.bulk_min_qty,
+        }
         with transaction.atomic():
-            instance = serializer.save()
+            extra = {}
+            if "average_cost" in serializer.validated_data:
+                # Manual cost correction — a deliberate owner entry, so
+                # mark the basis as known (§7A.8).
+                extra["cost_is_set"] = True
+            instance = serializer.save(**extra)
             write_outbox_entry(instance=instance, operation=OutboxEntry.UPDATE)
+            self._record_price_history(instance, previous=before)
+
+    def _record_price_history(self, product, *, previous):
+        """
+        Append a ProductPriceHistory row (§7A.1). `previous=None` for a
+        create (always log the opening price); on update, log only if a
+        price field actually changed.
+        """
+        if previous is not None and (
+            previous["retail_price"] == product.retail_price
+            and previous["bulk_price"] == product.bulk_price
+            and previous["bulk_min_qty"] == product.bulk_min_qty
+        ):
+            return
+        history = ProductPriceHistory.objects.create(
+            branch_id=product.branch_id,
+            product=product,
+            retail_price=product.retail_price,
+            bulk_price=product.bulk_price,
+            bulk_min_qty=product.bulk_min_qty,
+            changed_by=self.request.user,
+        )
+        write_outbox_entry(instance=history, operation=OutboxEntry.INSERT)
 
     def perform_destroy(self, instance):
         # Deactivation, not deletion (design doc B.3) -- so this stays

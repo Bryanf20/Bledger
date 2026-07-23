@@ -16,6 +16,7 @@ import ProductGrid from "./ProductGrid";
 import Cart from "./Cart";
 import PaymentPanel from "./PaymentPanel";
 import HeldSalesDrawer from "./HeldSalesDrawer";
+import BrokeredItemForm from "./BrokeredItemForm";
 import "./POSScreen.css";
 
 export default function POSScreen() {
@@ -29,6 +30,7 @@ export default function POSScreen() {
   const items = useCartStore((s) => s.items);
   const clear = useCartStore((s) => s.clear);
   const addItem = useCartStore((s) => s.addItem);
+  const addBrokeredItem = useCartStore((s) => s.addBrokeredItem);
   const restoreFrom = useCartStore((s) => s.restoreFrom);
   const subtotal = items.reduce((sum, i) => sum + i.lineTotal, 0);
 
@@ -56,6 +58,10 @@ export default function POSScreen() {
   // Scanning is on by default; the topbar toggle lets a cashier turn it
   // off if a misbehaving scanner is interfering.
   const [scanEnabled, setScanEnabled] = useState(true);
+
+  // The out-of-stock product a cashier tapped to sell as sourced
+  // (Phase 2 §7B.1); null when the brokered form is closed.
+  const [brokeredProduct, setBrokeredProduct] = useState(null);
 
   const productsById = useMemo(() => new Map((products ?? []).map((p) => [p.id, p])), [products]);
 
@@ -99,7 +105,7 @@ export default function POSScreen() {
   // can't fire behind the held-sales drawer or a hold/clear confirm.
   useBarcodeInput({
     onScan: handleScan,
-    enabled: scanEnabled && !showHeldDrawer && action === null,
+    enabled: scanEnabled && !showHeldDrawer && action === null && brokeredProduct === null,
   });
 
   const categories = useMemo(() => {
@@ -137,7 +143,17 @@ export default function POSScreen() {
       const sale = await createSaleMutation.mutateAsync({
         payment_method: paymentMethod,
         ...(isMomo ? { momo_reference: momoReference.trim(), momo_confirmed: momoConfirmed } : {}),
-        items: items.map((i) => ({ product: i.productId, quantity: i.quantity })),
+        items: items.map((i) =>
+          i.isBrokered
+            ? {
+                product: i.productId,
+                quantity: i.quantity,
+                is_brokered: true,
+                external_cost: i.externalCost,
+                source_note: i.sourceNote,
+              }
+            : { product: i.productId, quantity: i.quantity },
+        ),
       });
       clear();
       resetPaymentState();
@@ -154,7 +170,19 @@ export default function POSScreen() {
   async function confirmHoldSale() {
     await holdSaleMutation.mutateAsync({
       label: holdLabel,
-      cartData: { items: items.map((i) => ({ product: i.productId, quantity: i.quantity })) },
+      cartData: {
+        items: items.map((i) =>
+          i.isBrokered
+            ? {
+                product: i.productId,
+                quantity: i.quantity,
+                is_brokered: true,
+                external_cost: i.externalCost,
+                source_note: i.sourceNote,
+              }
+            : { product: i.productId, quantity: i.quantity },
+        ),
+      },
     });
     clear();
     resetPaymentState();
@@ -272,7 +300,12 @@ export default function POSScreen() {
             </div>
 
             <div className="pos-prod-scroll">
-              <ProductGrid products={visibleProducts} onSelect={addItem} view={view} />
+              <ProductGrid
+                products={visibleProducts}
+                onSelect={addItem}
+                onBrokered={setBrokeredProduct}
+                view={view}
+              />
             </div>
           </div>
 
@@ -363,6 +396,20 @@ export default function POSScreen() {
                 onConfirm={confirmClearCart}
                 confirmLabel="Clear cart"
                 danger
+              />
+            )}
+
+            {/* Sell-as-sourced form for a tapped out-of-stock product
+                (§7B.1). Confined to the right panel like the confirms
+                above. On add, the brokered line joins the cart. */}
+            {brokeredProduct && (
+              <BrokeredItemForm
+                product={brokeredProduct}
+                onCancel={() => setBrokeredProduct(null)}
+                onConfirm={({ quantity, externalCost, sourceNote }) => {
+                  addBrokeredItem(brokeredProduct, { quantity, externalCost, sourceNote });
+                  setBrokeredProduct(null);
+                }}
               />
             )}
           </div>

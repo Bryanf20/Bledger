@@ -16,7 +16,31 @@ from pathlib import Path
 
 from django.db import transaction
 
+from apps.core.utils.xaf import round_xaf
+
 from .models import Category, Product, ProductTemplate
+
+
+def weighted_average_cost(current_stock, current_avg, incoming_qty, incoming_cost):
+    """
+    New weighted-average unit cost after receiving `incoming_qty` units at
+    `incoming_cost` each, on top of `current_stock` units currently valued
+    at `current_avg` each (Phase 2 design §7A.5).
+
+        (current_stock x current_avg) + (incoming_qty x incoming_cost)
+        ---------------------------------------------------------------
+                       current_stock + incoming_qty
+
+    When current stock is at or below zero — an oversold product, or the
+    very first purchase of a product with no basis — there's nothing
+    meaningful to blend against, so the new average is simply the incoming
+    cost. Rounded to whole XAF, like every monetary value.
+    """
+    if current_stock <= 0:
+        return incoming_cost
+    total_value = current_stock * current_avg + incoming_qty * incoming_cost
+    total_qty = current_stock + incoming_qty
+    return round_xaf(total_value / total_qty)
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 

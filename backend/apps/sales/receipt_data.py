@@ -16,7 +16,9 @@ def build_receipt_context(sale):
 
     line_items = [
         {
-            "name": item.product.name,
+            # Snapshotted name (§7A.1) so a later product rename doesn't
+            # rewrite this receipt; fall back for pre-snapshot rows.
+            "name": item.product_name or item.product.name,
             "quantity": item.quantity,
             "line_total": format_xaf(item.line_total),
         }

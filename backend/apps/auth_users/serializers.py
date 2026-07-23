@@ -6,6 +6,7 @@ from django.contrib.auth import authenticate
 from django.conf import settings
 from rest_framework import serializers
 
+from .approvals import VALID_PURPOSES
 from .models import BledgerUser, Branch, BusinessSettings, derive_branch_code
 
 
@@ -260,6 +261,21 @@ class ResetPinSerializer(serializers.Serializer):
         if not value.isdigit():
             raise serializers.ValidationError("PIN must be exactly 4 digits.")
         return value
+
+
+class VerifyPinSerializer(serializers.Serializer):
+    """
+    POST /api/v1/auth/verify-pin/ — input shape for a manager-approval
+    check (Phase 2 design §3.2). The manager identifies themselves by
+    username (not PIN alone): a 4-digit PIN shared across managers would
+    be ambiguous about *who* approved, and requiring a known username
+    also shrinks the brute-force surface. `purpose` scopes the resulting
+    token to one kind of action.
+    """
+
+    username = serializers.CharField()
+    pin = serializers.CharField(min_length=4, max_length=4)
+    purpose = serializers.ChoiceField(choices=sorted(VALID_PURPOSES))
 
 
 class SetupSerializer(serializers.Serializer):
