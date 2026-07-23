@@ -42,6 +42,8 @@ SYNCED_TABLES = {
     "suppliers_purchasepayment": 1,
     "customers_customer": 1,
     "customers_customerpayment": 1,
+    "finances_expensecategory": 1,
+    "finances_cashbookentry": 1,
 }
 
 

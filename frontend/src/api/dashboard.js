@@ -49,6 +49,33 @@ export async function fetchStockAlerts() {
   return data; // { product_id, product_name, stock_level, low_stock_threshold, status }[]
 }
 
+// Phase 2 §3.4 / §7A.6 reporting — all Manager+.
+export async function fetchVarianceSummary(period) {
+  const { data } = await apiClient.get("/dashboard/variance-summary/", { params: { period } });
+  return data; // { period, total_surplus, total_discount, net_variance, per_cashier[] }
+}
+
+export async function fetchMarginSummary(period) {
+  const { data } = await apiClient.get("/dashboard/margin-summary/", { params: { period } });
+  return data; // { revenue, cogs, gross_margin, margin_pct, total_revenue, uncosted_revenue }
+}
+
+export async function fetchStockValuation() {
+  const { data } = await apiClient.get("/dashboard/stock-valuation/");
+  return data; // { stock_value, costed_products, cost_unknown_products }
+}
+
+export async function fetchLowMargin() {
+  const { data } = await apiClient.get("/dashboard/low-margin/");
+  return data; // { threshold_pct, products[] }
+}
+
+// Customers aged-debt (Phase 2 §4.5).
+export async function fetchAgedDebtReport() {
+  const { data } = await apiClient.get("/customers/aged-debt/");
+  return data; // AgedDebtRow[]
+}
+
 // Blob download for the toolbar's Export control -- same
 // responseType: "blob" + downloadBlob() pattern as
 // ReceiptScreen's fetchReceiptPdf/handleDownloadPdf.

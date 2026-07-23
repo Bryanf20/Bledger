@@ -485,6 +485,14 @@ New dashboard capability, all derivable once the above exists:
 - **Margin-squeeze alert** — flag products whose `average_cost` has risen by more than a configurable percentage without a corresponding `retail_price` change. This is the quiet killer of small retail margins and is the most valuable single output of this workstream.
 - **Low/negative margin report** — products being sold at or below cost, whether through a cost rise or over-aggressive haggling.
 
+**Implementation notes (Stage 2, step 8 — ✅ done):**
+
+- Three manager-only dashboard endpoints: `GET /dashboard/margin-summary/?period=` (gross margin = revenue − COGS over completed, non-voided, **cost-known** sale lines; lines with `unit_cost_at_sale = 0` excluded from both sides so margin isn't a false 100%, their revenue reported as `uncosted_revenue`), `GET /dashboard/stock-valuation/` (Σ `stock_level × average_cost` over cost-known active products; cost-unknown counted, not valued), `GET /dashboard/low-margin/` (products below the business `margin_alert_pct`, or at/below cost, worst-first).
+- The **margin-squeeze "cost rose without a price change"** variant (§7A.6 bullet 4) needs a cost-history series we don't keep yet; the shipped low-margin report covers the directly-computable "thin or loss-making" case. Cost-history-based squeeze detection is a follow-on.
+- The `variance-summary` (§3.4, step 6) and `aged-debt` (§4.5, step 7) endpoints already existed; step 8 surfaces all of them on the dashboard.
+- **Frontend** — a `ProfitCards` block on the Owner Dashboard (manager view only): gross margin + %, stock value, haggling surplus/discount/net, total owed by customers, and a thin/loss-making product list. esbuild-validated, not `npm run build`-tested.
+- Tests: `dashboard/tests/test_margin_reporting.py` (9). Full suite green except the pre-existing WeasyPrint tests.
+
 ### 7A.7 Interaction with other workstreams
 
 - **Negotiated pricing (B).** Once cost exists, the discount floor becomes far more meaningful — it can be expressed relative to cost rather than to catalogue price, so a cashier can never haggle below cost without approval. Recommend the floor remain percentage-of-catalogue as specified in feasibility §10, but add a hard "never below cost without manager approval" rule on top.
@@ -559,7 +567,9 @@ POS: a per-line "sell without stock (sourced)" action that prompts for the exter
 - **Policy chosen:** catalogue-only brokered items for v1 (a brokered line still references a `Product`); fully ad-hoc free-text items remain open decision #6.
 - Tests: `sales/tests/test_brokered_sales.py` (7). Full suite green except the pre-existing WeasyPrint tests. Frontend esbuild-validated, not `npm run build`-tested.
 
-### 7B.2 Expense cashbook
+### 7B.2 Expense cashbook — ✅ **done**
+
+> **Implemented (step 8b).** New `apps.finances` app: `ExpenseCategory` + `CashbookEntry` (both `BaseModel`, branch-owned, `SYNCED` + outbox-written). `CashbookEntryViewSet` allows PATCH + DELETE (soft-delete writes a DELETE tombstone) — the deliberate editable-bookkeeping exception. `ExpenseCategoryViewSet` is create/edit only (no delete) and exposes `POST /finances/expense-categories/seed-defaults/`, an idempotent per-branch seeder for the standard category set (categories are branch-scoped, so a migration can't seed them — the frontend calls it on first visit). Income entries reject a category at the serializer. Registered in `SYNCED_TABLES` + `test_registry`'s `PROJECT_APP_LABELS`; migration `0001_initial` header neutralised. 9 backend tests in `apps/finances/tests/test_finances.py` (seed idempotency, cashier 403, expense create/edit/soft-delete, income-no-category, branch scoping, P&L math, owner-only P&L).
 
 ```
 ExpenseCategory(BaseModel)     branch-owned, like inventory.Category
@@ -585,7 +595,9 @@ Roles: owner (and manager) record and view expenses; the net-profit P&L is owner
 
 Sync: `ExpenseCategory` and `CashbookEntry` are branch-owned (each branch has its own rent and transport), so they sync branch→cloud like sales — registered `SYNCED`, outbox-written. No conflict with the §6 ownership model.
 
-### 7B.3 Net-profit reporting
+### 7B.3 Net-profit reporting — ✅ **done**
+
+> **Implemented (step 8b).** `GET /finances/pnl/?period=today|week|month` (`IsOwner`) returns `{gross_margin, revenue, cogs, total_expenses, total_income, net_profit, expenses_by_category[]}`. `services.period_pnl()` reuses the same cost-known-sale-line aggregation as §7A.6's margin summary for gross margin, matches cashbook entries by `occurred_on` within the period's date span, and computes `net = gross_margin − expenses + income`. Uses `apps.dashboard.services.period_range/resolve_period` so periods agree with the dashboard.
 
 The payoff, pairing with Step 8's margin reporting:
 
@@ -597,6 +609,8 @@ The payoff, pairing with Step 8's margin reporting:
 ### 7B.4 Screens
 
 A new **Finances** screen (owner/manager): the cashbook list (expenses + income), an add-expense form, expense-category management, the by-category breakdown, and the period P&L. Brokered-sale entry lives at the POS (§7B.1), not here — its gain simply appears in the P&L's gross-margin line.
+
+> **Implemented (step 8b).** `frontend/src/features/finances/FinancesScreen.{jsx,css}` + `api/finances.js` + `hooks/useFinances.js`. Period toggle (today/week/month); owner-only P&L card strip (gross margin − expenses + income = net profit) with the by-category breakdown; a record-entry form (expense/income toggle, category select for expenses, amount/date/note); and the cashbook ledger with inline edit + delete per row. Manager+ route (`RoleGuard minimumRole="manager"` in `App.jsx`, like Suppliers); the P&L panel is hidden for non-owner managers (they see a hint) rather than bouncing the route. NavRail gained a 💰 Finances item (manager+). On first visit with zero categories the screen calls `seed-defaults` once. `.fin-page`/`.fin-screen` added to `screen-layout.css`'s shared groups (incl. the mobile media query, which `.cust-page` had missed — fixed here too).
 
 ### 7B.5 Build placement
 
@@ -680,8 +694,8 @@ These ship without any cloud, so they reach real users fast and de-risk the sche
 | 5b | **Brokered sales (§7B.1)** — `SaleLineItem.is_brokered`/`source_note`, no-stock sale path, external cost as COGS | Captures the neighbour-sourcing gain; small, extends step 5 — ✅ **done** |
 | 6 | Negotiated pricing (§3) — bounds config, POS price editing, server enforcement, variance reporting | The culturally-critical feature — ✅ **done** |
 | 7 | Customer accounts & credit (§4) — models, POS integration, Customers screen, aged-debt report | Removes a real blind spot in daily cash — ✅ **done** |
-| 8 | Margin & valuation reporting (§7A.6) — margin dashboard, stock valuation, margin-squeeze alerts | The owner-facing payoff of step 5 |
-| 8b | **Finances & cashbook (§7B.2–7B.3)** — `ExpenseCategory`/`CashbookEntry`, Finances screen, net-profit P&L | Gross margin becomes *net* profit; pairs with step 8 |
+| 8 | Margin & valuation reporting (§7A.6) — margin dashboard, stock valuation, margin-squeeze alerts | The owner-facing payoff of step 5 — ✅ **done** |
+| 8b | **Finances & cashbook (§7B.2–7B.3)** — `ExpenseCategory`/`CashbookEntry`, Finances screen, net-profit P&L | Gross margin becomes *net* profit; pairs with step 8 — ✅ **done** |
 
 Step 5 lands before negotiated pricing deliberately: once cost exists, the discount floor can enforce "never below cost" (§7A.7), which is a materially stronger control than a percentage-of-catalogue floor alone. Brokered sales (5b) sit right after cost tracking because they're a small extension of it. The finances cashbook (8b) pairs with margin reporting (8) so the dashboard gains one honest bottom line rather than two half-pictures.
 

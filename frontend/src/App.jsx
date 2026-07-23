@@ -12,6 +12,7 @@ import InventoryScreen from "./features/inventory/InventoryScreen";
 import SalesHistoryScreen from "./features/sales/SalesHistoryScreen";
 import SuppliersScreen from "./features/suppliers/SuppliersScreen";
 import CustomersScreen from "./features/customers/CustomersScreen";
+import FinancesScreen from "./features/finances/FinancesScreen";
 import DashboardScreen from "./features/dashboard/DashboardScreen";
 
 function FullPageLoader() {
@@ -165,6 +166,24 @@ export default function App() {
               <RequireAuth>
                 <RoleGuard minimumRole="manager" redirectTo="/pos">
                   <SuppliersScreen />
+                </RoleGuard>
+              </RequireAuth>
+            </RequireSetupComplete>
+          }
+        />
+        {/* Manager+ only, like /suppliers -- recording expenses and
+            managing categories is IsManagerOrOwner across apps/finances,
+            and the net-profit P&L endpoint is owner-only (the screen
+            hides that panel for non-owners rather than bouncing the
+            route). RoleGuard stops a cashier who types the URL; NavRail
+            already hides the nav item for them. */}
+        <Route
+          path="/finances"
+          element={
+            <RequireSetupComplete>
+              <RequireAuth>
+                <RoleGuard minimumRole="manager" redirectTo="/pos">
+                  <FinancesScreen />
                 </RoleGuard>
               </RequireAuth>
             </RequireSetupComplete>

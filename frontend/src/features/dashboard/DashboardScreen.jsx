@@ -10,6 +10,7 @@ import TopProductsTable from "./TopProductsTable";
 import PaymentBreakdownCard from "./PaymentBreakdownCard";
 import StockAlertsCard from "./StockAlertsCard";
 import RecentSalesList from "./RecentSalesList";
+import ProfitCards from "./ProfitCards";
 import { extractErrorMessage } from "../../api/errors";
 import { fetchSalesReport } from "../../api/dashboard";
 import { downloadBlob } from "../../utils/downloadBlob";
@@ -155,6 +156,7 @@ export default function DashboardScreen() {
               <div className="dash-main-col">
                 <div className="dash-main-scroll">
                   <SalesChart data={chartData} isLoading={chartLoading} />
+                  <ProfitCards period={period} />
                   <TopProductsTable products={topProducts} isLoading={topProductsLoading} />
                 </div>
               </div>

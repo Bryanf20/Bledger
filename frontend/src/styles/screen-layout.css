@@ -32,6 +32,7 @@
 .sh-page,
 .sup-page,
 .cust-page,
+.fin-page,
 .dash-page {
   height: 100vh;
   overflow: hidden;
@@ -60,6 +61,7 @@
 .sh-screen,
 .sup-screen,
 .cust-screen,
+.fin-screen,
 .dash-screen {
   flex: 1;
   min-height: 0;
@@ -127,6 +129,8 @@
   .inv-page,
   .sh-page,
   .sup-page,
+  .cust-page,
+  .fin-page,
   .dash-page {
     padding-left: 0;
     padding-bottom: 56px;

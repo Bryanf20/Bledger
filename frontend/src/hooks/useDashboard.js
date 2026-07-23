@@ -1,10 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  fetchAgedDebtReport,
   fetchDashboardSummary,
+  fetchLowMargin,
+  fetchMarginSummary,
   fetchPaymentBreakdown,
   fetchSalesChart,
   fetchStockAlerts,
+  fetchStockValuation,
   fetchTopProducts,
+  fetchVarianceSummary,
 } from "../api/dashboard";
 import { fetchSales } from "../api/sales";
 
@@ -71,5 +76,47 @@ export function useRecentSales() {
     queryKey: ["dashboard", "recent-sales"],
     queryFn: () => fetchSales({}),
     staleTime: 15_000,
+  });
+}
+
+// Phase 2 reporting widgets (§3.4 variance, §7A.6 margin/valuation,
+// §4.5 aged debt) — all Manager+.
+export function useMarginSummary(period) {
+  return useQuery({
+    queryKey: ["dashboard", "margin-summary", period],
+    queryFn: () => fetchMarginSummary(period),
+    staleTime: 15_000,
+  });
+}
+
+export function useVarianceSummary(period) {
+  return useQuery({
+    queryKey: ["dashboard", "variance-summary", period],
+    queryFn: () => fetchVarianceSummary(period),
+    staleTime: 15_000,
+  });
+}
+
+export function useStockValuation() {
+  return useQuery({
+    queryKey: ["dashboard", "stock-valuation"],
+    queryFn: fetchStockValuation,
+    staleTime: 30_000,
+  });
+}
+
+export function useLowMargin() {
+  return useQuery({
+    queryKey: ["dashboard", "low-margin"],
+    queryFn: fetchLowMargin,
+    staleTime: 30_000,
+  });
+}
+
+export function useAgedDebt() {
+  return useQuery({
+    queryKey: ["dashboard", "aged-debt"],
+    queryFn: fetchAgedDebtReport,
+    staleTime: 30_000,
   });
 }

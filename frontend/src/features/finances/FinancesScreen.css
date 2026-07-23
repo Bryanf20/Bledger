@@ -1,0 +1,301 @@
+/* Finances & cashbook (Phase 2 §7B). The .fin-page / .fin-screen height
+   chain lives in styles/screen-layout.css's shared groups (added this
+   session, commas double-checked); this file duplicates that chain
+   locally as the same belt-and-braces insurance Inventory/Sales/
+   Suppliers use, plus everything unique to this screen. */
+
+.fin-page {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+}
+.fin-screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* body: single scroll region (unlike POS's two fixed panels) -- the P&L
+   summary, form and ledger stack and the whole thing scrolls as one. */
+.fin-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fin-period-toggle {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--color-background-secondary);
+  padding: 4px;
+  border-radius: var(--border-radius-md);
+}
+.fin-period-pill {
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  padding: 6px 14px;
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+}
+.fin-period-pill.active {
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.fin-hint {
+  padding: 8px 12px;
+  border-radius: var(--border-radius-md);
+  font-size: 12px;
+  background: var(--color-background-secondary);
+  color: var(--color-text-secondary);
+}
+
+/* --- P&L summary (owner) --- */
+.fin-pnl {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.fin-pnl-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.fin-pnl-card {
+  background: var(--color-background-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 14px;
+}
+.fin-pnl-card.net {
+  border-color: var(--color-border-secondary);
+  background: var(--color-background-secondary);
+}
+.fin-pnl-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-bottom: 6px;
+}
+.fin-pnl-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.fin-pnl-value.good {
+  color: var(--color-text-success);
+}
+.fin-pnl-value.danger {
+  color: var(--color-text-danger);
+}
+.fin-pnl-sub {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin-top: 4px;
+}
+
+.fin-breakdown {
+  background: var(--color-background-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 14px;
+}
+
+/* --- two columns: record form + ledger --- */
+.fin-columns {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.fin-form,
+.fin-ledger {
+  background: var(--color-background-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 14px;
+}
+
+.fin-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 12px;
+}
+
+.fin-dir-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.fin-dir-btn {
+  flex: 1;
+  border: 0.5px solid var(--color-border-secondary);
+  background: var(--color-background-secondary);
+  color: var(--color-text-secondary);
+  padding: 8px;
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+}
+.fin-dir-btn.active.expense {
+  background: var(--color-background-danger);
+  color: var(--color-text-danger);
+  border-color: var(--color-text-danger);
+  font-weight: 600;
+}
+.fin-dir-btn.active.income {
+  background: var(--color-background-success);
+  color: var(--color-text-success);
+  border-color: var(--color-text-success);
+  font-weight: 600;
+}
+
+.fin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.fin-field input,
+.fin-field select {
+  padding: 8px 10px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-sm);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+
+.fin-submit {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  background: var(--color-brand-primary, var(--color-text-primary));
+  color: var(--color-text-inverse, #fff);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.fin-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* --- ledger --- */
+.fin-ledger-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.fin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.fin-table th,
+.fin-table td {
+  text-align: left;
+  padding: 8px 6px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  color: var(--color-text-primary);
+}
+.fin-table th {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+.fin-table .num {
+  text-align: right;
+}
+
+.fin-dir-tag {
+  font-size: 12px;
+}
+.fin-dir-tag.expense {
+  color: var(--color-text-primary);
+}
+.fin-dir-tag.income {
+  color: var(--color-text-success);
+  font-weight: 600;
+}
+.fin-note {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+}
+
+.fin-amt-neg {
+  color: var(--color-text-danger);
+}
+.fin-amt-pos {
+  color: var(--color-text-success);
+}
+
+.fin-inline-input {
+  width: 90px;
+  padding: 4px 6px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-sm);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  text-align: right;
+}
+
+.fin-row-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+.fin-mini-btn {
+  border: 0.5px solid var(--color-border-secondary);
+  background: var(--color-background-secondary);
+  color: var(--color-text-secondary);
+  padding: 4px 8px;
+  border-radius: var(--border-radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 4px;
+}
+.fin-mini-btn.danger {
+  color: var(--color-text-danger);
+}
+.fin-mini-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.fin-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+}
+
+/* Narrow viewports: stack the P&L cards and the two columns. */
+@media (max-width: 860px) {
+  .fin-pnl-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .fin-columns {
+    grid-template-columns: 1fr;
+  }
+}

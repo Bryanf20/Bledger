@@ -217,6 +217,121 @@ class VarianceSummaryView(APIView):
         )
 
 
+class MarginSummaryView(APIView):
+    """GET /api/v1/dashboard/margin-summary/?period=today|week|month
+
+    Gross margin for the period (Phase 2 design §7A.6): revenue minus
+    cost of goods sold, over completed (non-voided) sale lines whose COGS
+    is known. Lines with unit_cost_at_sale = 0 (cost never set) are
+    excluded from BOTH revenue and COGS so the margin isn't inflated to a
+    false 100%; their revenue is reported separately as `uncosted_revenue`
+    for context. Manager+ only — cost is financial data."""
+
+    permission_classes = [IsManagerOrOwner]
+
+    def get(self, request):
+        period = resolve_period(request.query_params.get("period"))
+        start, end = period_range(period)
+        lines = SaleLineItem.objects.filter(sale__in=_branch_sales(request, start, end))
+
+        costed = lines.filter(unit_cost_at_sale__gt=0)
+        agg = costed.aggregate(
+            revenue=Coalesce(Sum("line_total"), Value(0, output_field=IntegerField())),
+            cogs=Coalesce(
+                Sum(F("unit_cost_at_sale") * F("quantity")),
+                Value(0, output_field=IntegerField()),
+            ),
+        )
+        revenue = agg["revenue"]
+        cogs = agg["cogs"]
+        gross_margin = revenue - cogs
+        margin_pct = round((gross_margin / revenue) * 100, 1) if revenue else None
+
+        total_revenue = lines.aggregate(
+            r=Coalesce(Sum("line_total"), Value(0, output_field=IntegerField()))
+        )["r"]
+
+        return Response(
+            {
+                "period": period,
+                "revenue": revenue,          # revenue from cost-known lines only
+                "cogs": cogs,
+                "gross_margin": gross_margin,
+                "margin_pct": margin_pct,
+                "total_revenue": total_revenue,               # all completed lines
+                "uncosted_revenue": total_revenue - revenue,  # excluded from margin
+            }
+        )
+
+
+class StockValuationView(APIView):
+    """GET /api/v1/dashboard/stock-valuation/
+
+    The money currently sitting on the shelves (§7A.6): Σ(stock_level ×
+    average_cost) over active products whose cost is known — often the
+    single largest asset in these businesses and previously invisible.
+    Products with no cost basis are counted separately, not valued at 0.
+    Not period-scoped (a live snapshot). Manager+ only."""
+
+    permission_classes = [IsManagerOrOwner]
+
+    def get(self, request):
+        products = Product.objects.filter(branch_id=request.branch_id, is_active=True)
+        costed = products.filter(cost_is_set=True)
+        value = costed.aggregate(
+            v=Coalesce(
+                Sum(F("stock_level") * F("average_cost")),
+                Value(0, output_field=IntegerField()),
+            )
+        )["v"]
+        return Response(
+            {
+                "stock_value": value,
+                "costed_products": costed.count(),
+                "cost_unknown_products": products.filter(cost_is_set=False).count(),
+            }
+        )
+
+
+class LowMarginView(APIView):
+    """GET /api/v1/dashboard/low-margin/
+
+    Products whose margin has thinned to below the business's
+    margin-alert threshold, or which are selling at or below cost
+    (§7A.6 — the quiet killer of small-retail margins). Only products
+    with a known cost are considered; sorted worst-first. Manager+."""
+
+    permission_classes = [IsManagerOrOwner]
+
+    def get(self, request):
+        from apps.auth_users.models import BusinessSettings
+
+        threshold = BusinessSettings.load().margin_alert_pct
+        products = Product.objects.filter(
+            branch_id=request.branch_id, is_active=True, cost_is_set=True
+        )
+        rows = []
+        for p in products:
+            if p.retail_price <= 0:
+                continue
+            margin = p.retail_price - p.average_cost
+            margin_pct = round((margin / p.retail_price) * 100, 1)
+            if margin_pct < threshold:
+                rows.append(
+                    {
+                        "product_id": str(p.id),
+                        "name": p.name,
+                        "retail_price": p.retail_price,
+                        "average_cost": p.average_cost,
+                        "margin": margin,
+                        "margin_pct": margin_pct,
+                        "at_or_below_cost": margin <= 0,
+                    }
+                )
+        rows.sort(key=lambda r: r["margin_pct"])
+        return Response({"threshold_pct": threshold, "products": rows})
+
+
 class SalesChartView(APIView):
     """GET /api/v1/dashboard/sales-chart/?period=today|week|month
 

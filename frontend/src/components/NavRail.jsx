@@ -36,6 +36,9 @@ const NAV_ITEMS = [
   // in the screen and the API, not by hiding the nav item).
   { to: "/customers", label: "Customers", icon: "👤", minimumRole: "cashier" },
   { to: "/suppliers", label: "Suppliers", icon: "🚚", minimumRole: "manager" },
+  // Finances is manager+ for bookkeeping; the net-profit panel inside is
+  // owner-only (gated in the screen, not by hiding the whole nav item).
+  { to: "/finances", label: "Finances", icon: "💰", minimumRole: "manager" },
   { to: "/dashboard", label: "Dashboard", icon: "📊", minimumRole: "manager" },
 ];
 

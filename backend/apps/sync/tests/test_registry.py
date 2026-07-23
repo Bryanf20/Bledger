@@ -29,6 +29,7 @@ PROJECT_APP_LABELS = {
     "printing",
     "suppliers",
     "customers",
+    "finances",
     "dashboard",
     "sync",
 }

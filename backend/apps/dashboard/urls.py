@@ -2,10 +2,13 @@ from django.urls import path
 
 from .reports_views import ProductsReportView, SalesReportView, StockReportView
 from .views import (
+    LowMarginView,
+    MarginSummaryView,
     PaymentBreakdownView,
     SalesChartView,
     SalesSummaryView,
     StockAlertView,
+    StockValuationView,
     TopProductsView,
     VarianceSummaryView,
 )
@@ -22,6 +25,9 @@ urlpatterns = [
     path("dashboard/payment-breakdown/", PaymentBreakdownView.as_view(), name="dashboard-payment-breakdown"),
     path("dashboard/sales-chart/", SalesChartView.as_view(), name="dashboard-sales-chart"),
     path("dashboard/variance-summary/", VarianceSummaryView.as_view(), name="dashboard-variance-summary"),
+    path("dashboard/margin-summary/", MarginSummaryView.as_view(), name="dashboard-margin-summary"),
+    path("dashboard/stock-valuation/", StockValuationView.as_view(), name="dashboard-stock-valuation"),
+    path("dashboard/low-margin/", LowMarginView.as_view(), name="dashboard-low-margin"),
     path("dashboard/stock-alerts/", StockAlertView.as_view(), name="dashboard-stock-alerts"),
     path("reports/sales/", SalesReportView.as_view(), name="reports-sales"),
     path("reports/products/", ProductsReportView.as_view(), name="reports-products"),

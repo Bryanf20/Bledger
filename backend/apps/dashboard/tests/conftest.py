@@ -118,7 +118,7 @@ def out_of_stock_product(db, category):
     )
 
 
-def make_sale(cashier, product, quantity, unit_price, payment_method=Sale.CASH, when=None, status=Sale.COMPLETED, reference=None):
+def make_sale(cashier, product, quantity, unit_price, payment_method=Sale.CASH, when=None, status=Sale.COMPLETED, reference=None, unit_cost=0):
     total = quantity * unit_price
     sale = Sale.objects.create(
         branch_id=BRANCH_ID,
@@ -139,6 +139,8 @@ def make_sale(cashier, product, quantity, unit_price, payment_method=Sale.CASH, 
         quantity=quantity,
         catalogue_price=unit_price,
         actual_price=unit_price,
+        # COGS snapshot (Phase 2 §7A.5) — 0 means "cost unknown".
+        unit_cost_at_sale=unit_cost,
         line_total=total,
     )
     return sale
