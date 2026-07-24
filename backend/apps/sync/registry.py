@@ -103,6 +103,11 @@ NEVER_SYNCED = {
         "which pushed writes have already been applied. Meaningful only on "
         "the cloud; never replicated back to a branch."
     ),
+    "sync_syncstate": (
+        "Branch-local sync-engine state (Phase 2 design §2.7) — run lock, "
+        "backoff counters, last server time. Device operational state, not "
+        "a business record; never replicated."
+    ),
 }
 
 

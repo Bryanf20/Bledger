@@ -10,6 +10,7 @@ The branch *device* side (setup-wizard "Connect to head office", persisting
 the returned identity into its local Branch row) is frontend work in a later
 step; the push/pull protocol these identities authenticate is step 10.
 """
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -19,11 +20,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.auth_users.models import Branch, derive_branch_code, generate_sync_token
-from apps.core.permissions import IsOwner
+from apps.core.permissions import IsCashierOrAbove, IsOwner
 
 from .apply import APPLIED, DUPLICATE, REJECTED, EntryRejected, apply_entry
 from .authentication import DeviceSyncTokenAuthentication
-from .models import EnrolmentCode
+from .models import EnrolmentCode, OutboxEntry, SyncState
 from .permissions import IsEnrolledDevice
 from .serializers import (
     BranchProvisionSerializer,
@@ -202,5 +203,51 @@ class PushView(APIView):
                 "duplicate": sum(r["status"] == DUPLICATE for r in results),
                 "rejected": sum(r["status"] == REJECTED for r in results),
                 "server_time": timezone.now().isoformat().replace("+00:00", "Z"),
+            }
+        )
+
+
+class StatusView(APIView):
+    """
+    GET /api/v1/sync/status/ — local, user-authenticated connectivity read
+    for the frontend's sync indicator (Phase 2 design §2.6). Any staff role
+    may see it; sync health is not privileged information and offline is a
+    normal working state, never an error.
+    """
+
+    permission_classes = [IsCashierOrAbove]
+
+    def get(self, request):
+        sync_enabled = bool(getattr(settings, "SYNC_ENABLED", False))
+        pending = OutboxEntry.objects.filter(
+            synced_at__isnull=True, rejected_at__isnull=True
+        ).count()
+        rejected = OutboxEntry.objects.filter(rejected_at__isnull=False).count()
+
+        state = SyncState.objects.filter(pk=1).first()
+        failures = state.consecutive_failures if state else 0
+        last_success_at = state.last_success_at if state else None
+        last_error = state.last_error if state else None
+
+        # Four connectivity states (§2.6). "disabled" is the standalone
+        # case where there is no cloud at all.
+        if not sync_enabled:
+            connectivity = "disabled"
+        elif failures > 0:
+            connectivity = "offline"
+        elif pending > 0:
+            connectivity = "syncing"
+        else:
+            connectivity = "synced"
+
+        return Response(
+            {
+                "sync_enabled": sync_enabled,
+                "connectivity": connectivity,
+                "pending": pending,
+                "rejected": rejected,
+                "consecutive_failures": failures,
+                "last_success_at": last_success_at,
+                "last_error": last_error,
             }
         )

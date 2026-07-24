@@ -52,3 +52,12 @@ ENROLMENT_CODE_TTL_DAYS = env.int("ENROLMENT_CODE_TTL_DAYS", default=7)
 # Same LAN-only CORS posture as standalone: other devices in the shop point
 # their browser at this host's local IP (design doc §4.2).
 CORS_ALLOWED_ORIGIN_REGEXES = [r"^http://(192\.168|10)\.\d+\.\d+\.\d+(:\d+)?$"]
+
+# django.tasks backend for the sync push loop (Phase 2 design §2.7). The
+# immediate backend runs an enqueued task inline and needs no extra tables;
+# it's a safe default because the *tested* trigger is `manage.py sync_push`
+# from system cron, not a background worker. Swap in a durable backend
+# (e.g. django.tasks database backend) if you'd rather run a worker.
+TASKS = {
+    "default": {"BACKEND": "django.tasks.backends.immediate.ImmediateBackend"},
+}

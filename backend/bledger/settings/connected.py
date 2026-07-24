@@ -40,3 +40,12 @@ CLOUD_AUTH_ENABLED = True
 SYNC_PUSH_INTERVAL_SECONDS = env.int("SYNC_PUSH_INTERVAL_SECONDS", default=30)
 
 CORS_ALLOWED_ORIGINS = env.list("DJANGO_CORS_ALLOWED_ORIGINS", default=[])
+
+# django.tasks backend for the sync push loop (Phase 2 design §2.7). The
+# immediate backend runs an enqueued task inline and needs no extra tables;
+# it's a safe default because the *tested* trigger is `manage.py sync_push`
+# from system cron, not a background worker. Swap in a durable backend
+# (e.g. django.tasks database backend) if you'd rather run a worker.
+TASKS = {
+    "default": {"BACKEND": "django.tasks.backends.immediate.ImmediateBackend"},
+}

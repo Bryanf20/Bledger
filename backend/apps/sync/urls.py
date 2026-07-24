@@ -5,10 +5,11 @@ in later steps.
 """
 from django.urls import path
 
-from .views import BranchProvisionView, EnrolView, PushView
+from .views import BranchProvisionView, EnrolView, PushView, StatusView
 
 urlpatterns = [
     path("enrol/", EnrolView.as_view(), name="sync-enrol"),
     path("branches/", BranchProvisionView.as_view(), name="sync-branch-provision"),
     path("push/", PushView.as_view(), name="sync-push"),
+    path("status/", StatusView.as_view(), name="sync-status"),
 ]

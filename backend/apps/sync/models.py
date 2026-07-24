@@ -53,9 +53,16 @@ class OutboxEntry(models.Model):
     attempted = models.PositiveIntegerField(default=0)
     last_error = models.TextField(null=True, blank=True)
 
-    # NULL = pending. Set by the sync engine (Phase 2) after the cloud
-    # confirms the push.
+    # NULL = pending. Set by the sync engine after the cloud confirms the
+    # push (status applied/duplicate).
     synced_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    # NULL = not rejected. Set when the cloud reports the entry permanently
+    # invalid (Phase 2 design §2.4 `rejected`): the push loop stops retrying
+    # it and it is surfaced to the owner via the sync health view (§2.6).
+    # last_error carries the reason. An entry is "pending" only while BOTH
+    # synced_at and rejected_at are NULL.
+    rejected_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
         ordering = ["created_at"]
@@ -191,3 +198,44 @@ class AppliedEntry(models.Model):
 
     def __str__(self):
         return f"{self.branch_id}:{self.outbox_id} -> {self.table_name}:{self.record_id}"
+
+
+class SyncState(models.Model):
+    """
+    Branch-local state for the push/pull loop (Phase 2 design §2.7). A
+    singleton (pk is always 1), living on the branch's own SQLite — it is
+    device operational state, not a business record, so it is never synced
+    (see apps.sync.registry.NEVER_SYNCED). Backs GET /sync/status/ (§2.6).
+    """
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+
+    # Run lock (§2.7): a cycle claims it with an atomic conditional UPDATE
+    # so two overlapping runs can't double-push. A stale lock (a crashed
+    # run) is taken over after LOCK_STALE_SECONDS.
+    locked_at = models.DateTimeField(null=True, blank=True)
+
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_success_at = models.DateTimeField(null=True, blank=True)
+
+    # Drives exponential backoff (§2.7): 0 while healthy, incremented on
+    # each failed cycle, reset to 0 on success.
+    consecutive_failures = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(null=True, blank=True)
+
+    # The cloud clock from the last successful contact — passed back as
+    # ?since= on pull (step 12). Never a device clock (§2.4).
+    last_server_time = models.CharField(max_length=40, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        # Pin to a single row, mirroring BusinessSettings.
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return f"SyncState(failures={self.consecutive_failures})"
