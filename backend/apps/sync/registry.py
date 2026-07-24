@@ -92,6 +92,17 @@ NEVER_SYNCED = {
         "The outbox is the sync mechanism itself. Replicating it would be "
         "infinitely recursive."
     ),
+    "sync_enrolmentcode": (
+        "Cloud-only enrolment plumbing (Phase 2 design §2.3) — one-time "
+        "codes that mint branch identities. Lives solely on the cloud; "
+        "there is nothing to replicate to a branch, and pushing it back "
+        "would be nonsensical."
+    ),
+    "sync_appliedentry": (
+        "Cloud-only idempotency ledger (Phase 2 design §2.4) recording "
+        "which pushed writes have already been applied. Meaningful only on "
+        "the cloud; never replicated back to a branch."
+    ),
 }
 
 

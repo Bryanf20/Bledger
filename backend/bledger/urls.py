@@ -29,7 +29,7 @@ urlpatterns = [
     path("api/v1/", include("apps.finances.urls")),
     path("api/v1/", include("apps.activity.urls")),
     path("api/v1/", include("apps.dashboard.urls")),
-    # path("api/v1/sync/", include("apps.sync.urls")),  # Phase 2, 503 until enabled
+    path("api/v1/sync/", include("apps.sync.urls")),  # Phase 2 Stage 3 — enrolment (step 9)
 ]
 
 if settings.DEBUG and apps.is_installed("debug_toolbar"):

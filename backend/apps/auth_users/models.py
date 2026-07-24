@@ -12,6 +12,7 @@ doesn't fit the synced-table shape (branch_id, deleted_at, synced_at,
 version) BaseModel is built for.
 """
 import re
+import secrets
 import uuid
 
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
@@ -55,6 +56,18 @@ def derive_branch_code(*names, taken=()):
         if attempt not in taken:
             return attempt
     raise ValueError("Could not derive a unique branch code.")
+
+
+def generate_sync_token():
+    """
+    A long-lived, unguessable device sync token (Phase 2 design §2.4).
+
+    Issued by the cloud at enrolment and stored on the branch's local
+    Branch row (write-only); it authenticates this device's push/pull
+    calls with no user logged in. token_urlsafe(32) yields ~43 URL-safe
+    chars, comfortably inside Branch.sync_token's max_length=64.
+    """
+    return secrets.token_urlsafe(32)
 
 
 class Branch(models.Model):
@@ -106,6 +119,53 @@ class Branch(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # ------------------------------------------------------------------
+    # Phase 2 (Stage 3, step 9) — cloud identity & enrolment (§2.3).
+    # Every field below defaults to the standalone "not enrolled" state,
+    # so Phase 1 single-shop installs are completely unaffected: they
+    # never set cloud_id/sync_token and keep using settings.BRANCH_ID.
+    # ------------------------------------------------------------------
+
+    # True for the head-office branch. HQ owns the catalogue and may
+    # still run a till (open decision §10.2, resolved this session: HQ is
+    # a sellable branch, not a pure console).
+    is_hq = models.BooleanField(default=False)
+
+    # Canonical branch identity assigned by the cloud at enrolment. Once
+    # set, DeploymentContextMiddleware stamps THIS (not settings.BRANCH_ID)
+    # onto every request, so records this device creates carry the id the
+    # cloud agreed on. NULL until enrolled. Unique so two devices cannot
+    # claim the same cloud identity locally.
+    cloud_id = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        unique=True,
+        db_index=True,
+        help_text="Canonical branch_id issued by the cloud at enrolment.",
+    )
+
+    # Long-lived device credential authenticating this device's pushes /
+    # pulls to the cloud (§2.4 — sync must work with nobody logged in, so
+    # it is a device token, not a user token). Write-only: never appears
+    # in any serializer's field list. On the cloud side it identifies the
+    # calling device (see DeviceSyncTokenAuthentication).
+    sync_token = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        unique=True,
+        help_text="Device sync token (write-only).",
+    )
+
+    # Last time this device completed a sync cycle; surfaced later by the
+    # connectivity UX (§2.6) and the HQ per-branch last-seen view.
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+
+    # HQ can deactivate a branch (lost device, closed shop) so its token
+    # stops authenticating, without deleting historical records.
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["business_name"]
