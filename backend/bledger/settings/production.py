@@ -5,7 +5,7 @@ module at all, they ship `standalone.py` inside the Tauri bundle).
 
 Adds: security headers, static file serving via whitenoise, Sentry.
 """
-from .connected import *  # noqa: F401,F403
+from .connected import *
 from .connected import MIDDLEWARE, env
 
 DEBUG = False
@@ -16,6 +16,16 @@ CSRF_COOKIE_SECURE = True
 SECURE_HSTS_SECONDS = 60 * 60 * 24 * 7
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Railway/most PaaS terminate TLS at the edge and forward over HTTP with
+# X-Forwarded-Proto: https. Without this, SECURE_SSL_REDIRECT would see
+# "http" and redirect-loop forever.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# Django 4+ requires the deployed HTTPS origin(s) to be trusted for any
+# cookie-authenticated POST (admin, session). Set to the cloud's public
+# URL(s), e.g. https://bledger-hq.up.railway.app
+CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])
 
 MIDDLEWARE = MIDDLEWARE[:1] + ["whitenoise.middleware.WhiteNoiseMiddleware"] + MIDDLEWARE[1:]
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"

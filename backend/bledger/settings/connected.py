@@ -16,21 +16,30 @@ covers task definition/queuing out of the box; only reach for an
 external broker if django.tasks' built-in backends prove insufficient
 at scale.
 """
-from .base import *  # noqa: F401,F403
+from .base import *
 from .base import env
 
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("POSTGRES_DB"),
-        "USER": env("POSTGRES_USER"),
-        "PASSWORD": env("POSTGRES_PASSWORD"),
-        "HOST": env("POSTGRES_HOST"),
-        "PORT": env("POSTGRES_PORT", default="5432"),
+# Railway (and most PaaS) inject a single DATABASE_URL for the provisioned
+# Postgres plugin; prefer it when present, and fall back to the discrete
+# POSTGRES_* vars for local docker-compose / DigitalOcean setups. Either way
+# this is the *cloud* database — branch devices stay on SQLite.
+if env("DATABASE_URL", default=""):
+    DATABASES = {"default": env.db("DATABASE_URL")}
+    DATABASES["default"].setdefault("CONN_MAX_AGE", 600)
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("POSTGRES_DB"),
+            "USER": env("POSTGRES_USER"),
+            "PASSWORD": env("POSTGRES_PASSWORD"),
+            "HOST": env("POSTGRES_HOST"),
+            "PORT": env("POSTGRES_PORT", default="5432"),
+            "CONN_MAX_AGE": 600,
+        }
     }
-}
 
 SYNC_ENABLED = True
 CLOUD_AUTH_ENABLED = True
