@@ -37,3 +37,16 @@ def push_outbox_task():
         # Not enrolled / no cloud URL yet — nothing to do, not an error.
         return FAILED
     return run_push_cycle(client=client)
+
+
+@task
+def sync_task():
+    """One full push+pull cycle. Safe to call on every scheduler tick."""
+    from .cloud_client import CloudClient, TransientSyncError
+    from .engine import FAILED, run_sync_cycle
+
+    try:
+        client = CloudClient.from_settings_and_branch()
+    except TransientSyncError:
+        return FAILED, FAILED
+    return run_sync_cycle(client=client)

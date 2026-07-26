@@ -1,5 +1,6 @@
 from django.urls import path
 
+from .hq_views import HQSummaryView
 from .reports_views import ProductsReportView, SalesReportView, StockReportView
 from .views import (
     BrokeredSummaryView,
@@ -31,6 +32,7 @@ urlpatterns = [
     path("dashboard/low-margin/", LowMarginView.as_view(), name="dashboard-low-margin"),
     path("dashboard/brokered-summary/", BrokeredSummaryView.as_view(), name="dashboard-brokered-summary"),
     path("dashboard/stock-alerts/", StockAlertView.as_view(), name="dashboard-stock-alerts"),
+    path("hq/summary/", HQSummaryView.as_view(), name="hq-summary"),
     path("reports/sales/", SalesReportView.as_view(), name="reports-sales"),
     path("reports/products/", ProductsReportView.as_view(), name="reports-products"),
     path("reports/stock/", StockReportView.as_view(), name="reports-stock"),

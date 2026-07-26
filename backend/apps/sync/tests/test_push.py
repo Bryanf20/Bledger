@@ -1,7 +1,12 @@
 """
 Cloud POST /api/v1/sync/push/ — durable, idempotent receipt of branch
-writes with per-entry results (Phase 2 design §2.4).
+writes with per-entry results (Phase 2 design §2.4, §2.5).
+
+Apply-mechanism tests use branch-owned tables (Customer / CustomerPayment):
+HQ-owned catalogue (Category/Product) is pull-only and a push of it is
+rejected — asserted separately in test_catalogue_push_is_rejected.
 """
+import datetime
 import uuid
 
 import pytest
@@ -9,35 +14,25 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from apps.auth_users.models import Branch
-from apps.inventory.models import Category, Product
-from apps.sync.models import AppliedEntry, OutboxEntry
+from apps.customers.models import Customer, CustomerPayment
+from apps.sync.models import AppliedEntry
 from apps.sync.utils import serialize_instance
 
 PUSH_URL = reverse("sync-push")
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture
 def device_branch(db):
     return Branch.objects.create(
-        business_name="Tabi Provisions",
-        branch_name="Limbe Branch",
-        phone="699000000",
-        code="LMB",
-        deployment_mode=Branch.DEPLOYMENT_CONNECTED,
-        setup_complete=True,
+        business_name="Tabi Provisions", branch_name="Limbe Branch",
+        phone="699000000", code="LMB",
+        deployment_mode=Branch.DEPLOYMENT_CONNECTED, setup_complete=True,
         sync_token="dev-token",
-        cloud_id=None,
     )
 
 
 @pytest.fixture
 def bid(device_branch):
-    # Records this device pushes are stamped with its canonical identity.
     return str(device_branch.id)
 
 
@@ -84,16 +79,15 @@ def test_deactivated_branch_cannot_push(device_branch, device_client):
 
 
 # ---------------------------------------------------------------------------
-# Applying
+# Applying (branch-owned tables)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
 def test_push_applies_a_new_record(bid, device_client):
-    cat = Category.objects.create(branch_id=bid, name="Grains", sort_order=1)
-    entry = entry_for(cat)
-    Category.all_objects.filter(pk=cat.id).delete()  # not on the cloud yet
-    assert not Category.all_objects.filter(pk=cat.id).exists()
+    cust = Customer.objects.create(branch_id=bid, name="Mama Ada")
+    entry = entry_for(cust)
+    Customer.all_objects.filter(pk=cust.id).delete()  # not on the cloud yet
 
     resp = device_client.post(PUSH_URL, {"entries": [entry]}, format="json")
     assert resp.status_code == 200, resp.content
@@ -102,35 +96,35 @@ def test_push_applies_a_new_record(bid, device_client):
     assert body["applied"] == 1
     assert "server_time" in body
 
-    recreated = Category.all_objects.get(pk=cat.id)
-    assert recreated.name == "Grains"
+    recreated = Customer.all_objects.get(pk=cust.id)
+    assert recreated.name == "Mama Ada"
     assert AppliedEntry.objects.filter(outbox_id=entry["outbox_id"]).count() == 1
 
 
 @pytest.mark.django_db
 def test_push_applies_record_with_foreign_key(bid, device_client):
-    cat = Category.objects.create(branch_id=bid, name="Grains", sort_order=1)
-    prod = Product.objects.create(
-        branch_id=bid, name="Rice 5kg", category=cat, unit="bag",
-        retail_price=4500, stock_level=50,
+    cust = Customer.objects.create(branch_id=bid, name="Mama Ada")
+    pay = CustomerPayment.objects.create(
+        branch_id=bid, customer=cust, amount=2000,
+        payment_date=datetime.date(2026, 7, 24), recorded_by=None,
     )
-    entry = entry_for(prod)
-    Product.all_objects.filter(pk=prod.id).delete()
+    entry = entry_for(pay)
+    CustomerPayment.all_objects.filter(pk=pay.id).delete()
 
     resp = device_client.post(PUSH_URL, {"entries": [entry]}, format="json")
     assert resp.status_code == 200, resp.content
     assert resp.json()["results"][0]["status"] == "applied"
 
-    recreated = Product.all_objects.get(pk=prod.id)
-    assert recreated.category_id == cat.id
-    assert recreated.retail_price == 4500
+    recreated = CustomerPayment.all_objects.get(pk=pay.id)
+    assert recreated.customer_id == cust.id
+    assert recreated.amount == 2000
 
 
 @pytest.mark.django_db
 def test_push_is_idempotent(bid, device_client):
-    cat = Category.objects.create(branch_id=bid, name="Grains", sort_order=1)
-    entry = entry_for(cat)
-    Category.all_objects.filter(pk=cat.id).delete()
+    cust = Customer.objects.create(branch_id=bid, name="Mama Ada")
+    entry = entry_for(cust)
+    Customer.all_objects.filter(pk=cust.id).delete()
 
     first = device_client.post(PUSH_URL, {"entries": [entry]}, format="json")
     second = device_client.post(PUSH_URL, {"entries": [entry]}, format="json")
@@ -142,49 +136,62 @@ def test_push_is_idempotent(bid, device_client):
 
 @pytest.mark.django_db
 def test_update_preserves_branch_version_and_does_not_bump(bid, device_client):
-    cat = Category.objects.create(branch_id=bid, name="Grains", sort_order=1)
-    # Simulate the branch having edited this row a few times: version 5.
-    payload = serialize_instance(cat)
-    payload["name"] = "Cereals"
+    cust = Customer.objects.create(branch_id=bid, name="Mama Ada")
+    payload = serialize_instance(cust)
+    payload["name"] = "Mama Adaeze"
     payload["version"] = 5
     entry = {
-        "outbox_id": str(uuid.uuid4()), "table_name": cat._meta.db_table,
-        "record_id": str(cat.id), "operation": "update", "payload": payload,
+        "outbox_id": str(uuid.uuid4()), "table_name": cust._meta.db_table,
+        "record_id": str(cust.id), "operation": "update", "payload": payload,
         "schema_version": 1,
     }
 
     resp = device_client.post(PUSH_URL, {"entries": [entry]}, format="json")
     assert resp.json()["results"][0]["status"] == "applied"
 
-    cat.refresh_from_db()
-    assert cat.name == "Cereals"
-    assert cat.version == 5  # taken from payload, not incremented to 2
+    cust.refresh_from_db()
+    assert cust.name == "Mama Adaeze"
+    assert cust.version == 5  # from payload, not incremented to 2
 
 
 @pytest.mark.django_db
 def test_delete_operation_applies_soft_delete_tombstone(bid, device_client):
-    cat = Category.objects.create(branch_id=bid, name="Grains", sort_order=1)
-    cat.soft_delete()
-    payload = serialize_instance(cat)  # deleted_at is set
+    cust = Customer.objects.create(branch_id=bid, name="Mama Ada")
+    cust.soft_delete()
+    payload = serialize_instance(cust)  # deleted_at set
     entry = {
-        "outbox_id": str(uuid.uuid4()), "table_name": cat._meta.db_table,
-        "record_id": str(cat.id), "operation": "delete", "payload": payload,
+        "outbox_id": str(uuid.uuid4()), "table_name": cust._meta.db_table,
+        "record_id": str(cust.id), "operation": "delete", "payload": payload,
         "schema_version": 1,
     }
-    # Wipe locally so we prove the tombstone is applied on insert.
-    Category.all_objects.filter(pk=cat.id).delete()
+    Customer.all_objects.filter(pk=cust.id).delete()
 
     resp = device_client.post(PUSH_URL, {"entries": [entry]}, format="json")
     assert resp.json()["results"][0]["status"] == "applied"
 
-    row = Category.all_objects.get(pk=cat.id)
+    row = Customer.all_objects.get(pk=cust.id)
     assert row.deleted_at is not None
-    assert not Category.objects.filter(pk=cat.id).exists()  # hidden by soft-delete manager
+    assert not Customer.objects.filter(pk=cust.id).exists()  # hidden by soft-delete manager
 
 
 # ---------------------------------------------------------------------------
 # Rejections (permanent)
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_catalogue_push_is_rejected(bid, device_client):
+    """§2.5 — HQ-owned catalogue is pull-only; a branch may not push it."""
+    for table in ("inventory_product", "inventory_category"):
+        entry = {
+            "outbox_id": str(uuid.uuid4()), "table_name": table,
+            "record_id": str(uuid.uuid4()), "operation": "update",
+            "payload": {"id": str(uuid.uuid4()), "branch_id": bid, "name": "X"},
+            "schema_version": 1,
+        }
+        r = device_client.post(PUSH_URL, {"entries": [entry]}, format="json").json()
+        assert r["results"][0]["status"] == "rejected", table
+        assert "catalogue" in r["results"][0]["error"].lower()
 
 
 @pytest.mark.django_db
@@ -213,10 +220,10 @@ def test_unregistered_table_is_rejected(bid, device_client):
 @pytest.mark.django_db
 def test_branch_id_mismatch_is_rejected(device_client):
     entry = {
-        "outbox_id": str(uuid.uuid4()), "table_name": "inventory_category",
+        "outbox_id": str(uuid.uuid4()), "table_name": "customers_customer",
         "record_id": str(uuid.uuid4()), "operation": "insert",
         "payload": {"id": str(uuid.uuid4()), "branch_id": "SOME-OTHER-BRANCH",
-                    "name": "X", "sort_order": 1}, "schema_version": 1,
+                    "name": "X"}, "schema_version": 1,
     }
     body = device_client.post(PUSH_URL, {"entries": [entry]}, format="json").json()
     assert body["results"][0]["status"] == "rejected"
@@ -226,18 +233,15 @@ def test_branch_id_mismatch_is_rejected(device_client):
 @pytest.mark.django_db
 def test_malformed_field_value_is_rejected(bid, device_client):
     """
-    A payload value that can't be coerced to its field type (here a
-    non-parseable datetime) is permanently invalid — reported `rejected`,
-    DB-independent. (Bad foreign keys are likewise rejected on the real
-    PostgreSQL cloud, where FK constraints are enforced; SQLite doesn't
-    enforce them, so that specific case isn't asserted here.)
+    A value that can't be coerced to its field type (non-parseable
+    datetime) is permanently invalid — reported `rejected`, DB-independent.
     """
     entry = {
-        "outbox_id": str(uuid.uuid4()), "table_name": "inventory_category",
+        "outbox_id": str(uuid.uuid4()), "table_name": "customers_customer",
         "record_id": str(uuid.uuid4()), "operation": "insert",
         "payload": {
             "id": str(uuid.uuid4()), "branch_id": bid, "name": "X",
-            "sort_order": 1, "created_at": "not-a-real-datetime", "version": 1,
+            "created_at": "not-a-real-datetime", "version": 1,
         },
         "schema_version": 1,
     }
@@ -252,9 +256,9 @@ def test_malformed_field_value_is_rejected(bid, device_client):
 
 @pytest.mark.django_db
 def test_mixed_batch_applies_good_entries_despite_a_rejection(bid, device_client):
-    good = Category.objects.create(branch_id=bid, name="Grains", sort_order=1)
+    good = Customer.objects.create(branch_id=bid, name="Good Customer")
     good_entry = entry_for(good)
-    Category.all_objects.filter(pk=good.id).delete()
+    Customer.all_objects.filter(pk=good.id).delete()
 
     bad_entry = {
         "outbox_id": str(uuid.uuid4()), "table_name": "made_up_table",
@@ -269,5 +273,14 @@ def test_mixed_batch_applies_good_entries_despite_a_rejection(bid, device_client
     statuses = {r["outbox_id"]: r["status"] for r in body["results"]}
     assert statuses[good_entry["outbox_id"]] == "applied"
     assert statuses[bad_entry["outbox_id"]] == "rejected"
-    # The rejection did not roll back the good entry.
-    assert Category.all_objects.filter(pk=good.id).exists()
+    assert Customer.all_objects.filter(pk=good.id).exists()
+
+
+@pytest.mark.django_db
+def test_push_stamps_branch_last_synced(device_branch, device_client):
+    """§2.6 — a push records the branch as last-seen (HQ dashboard data)."""
+    assert device_branch.last_synced_at is None
+    resp = device_client.post(PUSH_URL, {"entries": []}, format="json")
+    assert resp.status_code == 200
+    device_branch.refresh_from_db()
+    assert device_branch.last_synced_at is not None

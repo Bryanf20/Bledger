@@ -8,9 +8,11 @@ outside this function; run_push_cycle() is the whole unit of work and is
 safe to call on every tick — it self-limits via the run lock and the
 backoff window, and no-ops when there's nothing to send.
 """
+from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
+from .apply import EntryRejected, apply_payload
 from .cloud_client import TransientSyncError
 from .models import OutboxEntry, SyncState
 
@@ -27,6 +29,7 @@ DEFAULT_BATCH_SIZE = 100
 
 # Outcome codes returned by run_push_cycle for the caller/tests.
 PUSHED = "pushed"
+PULLED = "pulled"
 NOTHING = "nothing_to_push"
 SKIPPED_LOCKED = "skipped_locked"
 SKIPPED_BACKOFF = "skipped_backoff"
@@ -158,3 +161,73 @@ def run_push_cycle(*, client, batch_size=DEFAULT_BATCH_SIZE, now=None, respect_b
         return PUSHED
     finally:
         _release_lock()
+
+
+def run_pull_cycle(*, client, now=None, respect_backoff=True):
+    """
+    Pull HQ catalogue changes since the last server_time and apply them
+    (Phase 2 design §2.4). Mirrors run_push_cycle: same run lock, same
+    backoff, same "offline is normal, never raises" contract. Returns PULLED
+    on a successful contact (even if zero records), or a skip/fail code.
+    """
+    now = now or timezone.now()
+    state = SyncState.load()
+
+    if respect_backoff and state.consecutive_failures > 0 and state.last_attempt_at:
+        due = state.last_attempt_at + timezone.timedelta(
+            seconds=backoff_seconds(state.consecutive_failures)
+        )
+        if now < due:
+            return SKIPPED_BACKOFF
+
+    if not _acquire_lock(now):
+        return SKIPPED_LOCKED
+
+    try:
+        since = state.last_server_time
+        try:
+            response = client.pull(since)
+        except TransientSyncError as exc:
+            SyncState.objects.filter(pk=1).update(
+                last_attempt_at=now,
+                consecutive_failures=state.consecutive_failures + 1,
+                last_error=str(exc),
+            )
+            return FAILED
+
+        for record in response.get("records", []):
+            # Pulls are idempotent upserts; each record is applied in its own
+            # transaction so one bad row can't abort the rest. A rejected HQ
+            # catalogue row shouldn't happen, but if it does it's skipped and
+            # surfaced via last_error rather than stalling the whole pull.
+            try:
+                with transaction.atomic():
+                    apply_payload(record["table_name"], record["payload"])
+            except EntryRejected:
+                continue
+
+        SyncState.objects.filter(pk=1).update(
+            last_attempt_at=now,
+            last_success_at=now,
+            consecutive_failures=0,
+            last_error=None,
+            last_server_time=response.get("server_time") or since,
+        )
+        return PULLED
+    finally:
+        _release_lock()
+
+
+def run_sync_cycle(*, client, batch_size=DEFAULT_BATCH_SIZE, now=None, respect_backoff=True):
+    """
+    One full cycle: push the outbox, then pull catalogue changes (§2.7). Each
+    phase manages the lock and backoff itself, so if push fails the pull is
+    skipped by the same backoff window rather than hammering a down cloud.
+    Returns (push_outcome, pull_outcome).
+    """
+    now = now or timezone.now()
+    push_outcome = run_push_cycle(
+        client=client, batch_size=batch_size, now=now, respect_backoff=respect_backoff
+    )
+    pull_outcome = run_pull_cycle(client=client, now=now, respect_backoff=respect_backoff)
+    return push_outcome, pull_outcome

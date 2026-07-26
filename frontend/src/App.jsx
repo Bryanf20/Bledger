@@ -3,6 +3,7 @@ import { useAuth } from "./context/AuthContext";
 import { useSetupStatus } from "./hooks/useSetupStatus";
 import RoleGuard from "./components/RoleGuard";
 import NavRail from "./components/NavRail";
+import SyncToastHost from "./components/SyncToastHost";
 import LoginScreen from "./features/auth/LoginScreen";
 import SetupWizard from "./features/setup/SetupWizard";
 import HomePlaceholder from "./features/HomePlaceholder";
@@ -16,6 +17,8 @@ import FinancesScreen from "./features/finances/FinancesScreen";
 import LogsScreen from "./features/activity/LogsScreen";
 import SettingsScreen from "./features/settings/SettingsScreen";
 import DashboardScreen from "./features/dashboard/DashboardScreen";
+import SyncHealthScreen from "./features/sync/SyncHealthScreen";
+import HQDashboardScreen from "./features/hq/HQDashboardScreen";
 
 function FullPageLoader() {
   return (
@@ -75,6 +78,7 @@ export default function App() {
   return (
     <>
       {showNavRail && <NavRail />}
+      {showNavRail && <SyncToastHost />}
       <Routes>
         <Route
           path="/setup"
@@ -237,6 +241,34 @@ export default function App() {
             <RequireSetupComplete>
               <RequireAuth>
                 <DashboardScreen />
+              </RequireAuth>
+            </RequireSetupComplete>
+          }
+        />
+        {/* Owner-only HQ multi-branch dashboard (Phase 2 §2.4/§2.6) —
+            cross-branch aggregation; GET /hq/summary/ is IsOwner. */}
+        <Route
+          path="/hq"
+          element={
+            <RequireSetupComplete>
+              <RequireAuth>
+                <RoleGuard minimumRole="owner" redirectTo="/pos">
+                  <HQDashboardScreen />
+                </RoleGuard>
+              </RequireAuth>
+            </RequireSetupComplete>
+          }
+        />
+        {/* Owner-only sync health (Phase 2 §2.6) — rejected-with-reasons +
+            backlog; GET /sync/health/ is IsOwner, RoleGuard mirrors it. */}
+        <Route
+          path="/sync-health"
+          element={
+            <RequireSetupComplete>
+              <RequireAuth>
+                <RoleGuard minimumRole="owner" redirectTo="/pos">
+                  <SyncHealthScreen />
+                </RoleGuard>
               </RequireAuth>
             </RequireSetupComplete>
           }

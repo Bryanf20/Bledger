@@ -117,10 +117,6 @@ export default function InventoryScreen() {
           badge="Inventory"
           meta={
             <>
-              <span>
-                <span className="screen-sync-dot" />
-                Synced
-              </span>
               <span>{user?.branch?.branch_name}</span>
             </>
           }

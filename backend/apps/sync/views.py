@@ -13,6 +13,7 @@ step; the push/pull protocol these identities authenticate is step 10.
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -21,6 +22,7 @@ from rest_framework.views import APIView
 
 from apps.auth_users.models import Branch, derive_branch_code, generate_sync_token
 from apps.core.permissions import IsCashierOrAbove, IsOwner
+from apps.inventory.models import HQ_BRANCH_ID, Category, Product
 
 from .apply import APPLIED, DUPLICATE, REJECTED, EntryRejected, apply_entry
 from .authentication import DeviceSyncTokenAuthentication
@@ -31,6 +33,7 @@ from .serializers import (
     EnrolRequestSerializer,
     PushRequestSerializer,
 )
+from .utils import serialize_instance
 
 
 class BranchProvisionView(APIView):
@@ -178,6 +181,9 @@ class PushView(APIView):
         # The authenticated branch's canonical identity — what its records
         # are stamped with, and what AppliedEntry keys dedupe against.
         branch_id = str(request.auth.id)
+        # Record this branch as last-seen now (§2.6 per-branch last-seen,
+        # surfaced by the HQ dashboard). A bare timestamp write, no version.
+        Branch.objects.filter(pk=request.auth.pk).update(last_synced_at=timezone.now())
 
         results = []
         for entry in entries:
@@ -249,5 +255,108 @@ class StatusView(APIView):
                 "consecutive_failures": failures,
                 "last_success_at": last_success_at,
                 "last_error": last_error,
+            }
+        )
+
+
+class PullView(APIView):
+    """
+    GET /api/v1/sync/pull/?since=<server_timestamp> — the cloud serves this
+    branch the changes it needs (Phase 2 design §2.4): the HQ product
+    catalogue (Category, Product) and tombstones for soft-deleted catalogue
+    rows. A branch never pulls another branch's sales or stock — aggregation
+    is the HQ dashboard's job (step 14).
+
+    Catalogue is the one shared layer (§2.1); users and business config are a
+    later pull increment. `since` is the cloud clock this branch last saw
+    (returned as server_time); absent means a full catalogue snapshot. Device
+    clocks are never used (§2.4).
+    """
+
+    authentication_classes = [DeviceSyncTokenAuthentication]
+    permission_classes = [IsEnrolledDevice]
+
+    # Catalogue is emitted Category-before-Product so a branch applying the
+    # batch in order never hits a Product whose Category isn't there yet.
+    CATALOGUE_MODELS = (Category, Product)
+
+    def get(self, request):
+        # Record last-seen for the HQ dashboard (§2.6), same as push.
+        Branch.objects.filter(pk=request.auth.pk).update(last_synced_at=timezone.now())
+        since_raw = request.query_params.get("since")
+        since = parse_datetime(since_raw.replace("Z", "+00:00")) if since_raw else None
+
+        records = []
+        for model in self.CATALOGUE_MODELS:
+            # all_objects, not objects: soft-deleted rows must be included so
+            # their tombstones propagate (§2.5).
+            qs = model.all_objects.filter(branch_id=HQ_BRANCH_ID)
+            if since is not None:
+                qs = qs.filter(updated_at__gt=since)
+            for row in qs.order_by("updated_at"):
+                records.append(
+                    {
+                        "table_name": model._meta.db_table,
+                        "operation": "delete" if row.deleted_at else "update",
+                        "payload": serialize_instance(row),
+                    }
+                )
+
+        return Response(
+            {
+                "records": records,
+                "count": len(records),
+                "server_time": timezone.now().isoformat().replace("+00:00", "Z"),
+            }
+        )
+
+
+class HealthView(APIView):
+    """
+    GET /api/v1/sync/health/ — owner-only sync health (Phase 2 design §2.6).
+    Rejected entries are silent data loss unless someone can see them, so
+    this lists them with their reasons alongside the pending backlog and the
+    last-contact state. Per-branch last-seen (the HQ cross-branch view) is
+    step 14; this is the device's own health.
+    """
+
+    permission_classes = [IsOwner]
+
+    # Cap the rejected list so a pathological backlog can't return an
+    # unbounded response; the count above it is always exact.
+    REJECTED_LIMIT = 200
+
+    def get(self, request):
+        rejected_qs = OutboxEntry.objects.filter(rejected_at__isnull=False).order_by(
+            "-rejected_at"
+        )
+        rejected = [
+            {
+                "id": str(e.id),
+                "table_name": e.table_name,
+                "record_id": str(e.record_id),
+                "operation": e.operation,
+                "attempted": e.attempted,
+                "last_error": e.last_error,
+                "created_at": e.created_at,
+                "rejected_at": e.rejected_at,
+            }
+            for e in rejected_qs[: self.REJECTED_LIMIT]
+        ]
+        pending = OutboxEntry.objects.filter(
+            synced_at__isnull=True, rejected_at__isnull=True
+        ).count()
+
+        state = SyncState.objects.filter(pk=1).first()
+        return Response(
+            {
+                "sync_enabled": bool(getattr(settings, "SYNC_ENABLED", False)),
+                "pending": pending,
+                "rejected_count": rejected_qs.count(),
+                "rejected": rejected,
+                "last_success_at": state.last_success_at if state else None,
+                "last_attempt_at": state.last_attempt_at if state else None,
+                "consecutive_failures": state.consecutive_failures if state else 0,
+                "last_error": state.last_error if state else None,
             }
         )

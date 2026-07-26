@@ -39,6 +39,13 @@ APPLIED = "applied"
 DUPLICATE = "duplicate"
 REJECTED = "rejected"
 
+# HQ-owned catalogue tables: they flow cloud -> branch via pull only
+# (Phase 2 design §2.5, "Catalogue is HQ-owned; branches may only add
+# BranchPriceOverride"). A branch must never push them back, so a push of
+# one is permanently rejected. BranchPriceOverride is a separate,
+# branch-owned table and is unaffected.
+PULL_ONLY_TABLES = {"inventory_category", "inventory_product"}
+
 
 class EntryRejected(Exception):
     """A permanently invalid entry — recorded and never retried (§2.4)."""
@@ -143,6 +150,19 @@ def _upsert(model, pk, field_map):
         raise EntryRejected(f"Integrity error inserting {model._meta.db_table}: {exc}") from None
 
 
+def apply_payload(table_name, payload):
+    """
+    Resolve `table_name` to a model, deserialize `payload`, and upsert the
+    row. The shared core of both directions: push (branch -> cloud, wrapped
+    below with idempotency and ownership guards) and pull (cloud -> branch,
+    which calls this directly — pulls are naturally idempotent, a re-applied
+    row being a no-op upsert). Raises EntryRejected for permanent failures.
+    """
+    model = _model_for_table(table_name)
+    pk, field_map = deserialize_payload(model, payload)
+    _upsert(model, pk, field_map)
+
+
 def apply_entry(*, branch_id, entry):
     """
     Apply one pushed entry for `branch_id`. `entry` is a validated dict:
@@ -153,6 +173,7 @@ def apply_entry(*, branch_id, entry):
     rolls back another's.
     """
     outbox_id = entry["outbox_id"]
+    table_name = entry["table_name"]
     payload = entry["payload"]
 
     # Guard: a device may only push records stamped with its own identity.
@@ -163,13 +184,20 @@ def apply_entry(*, branch_id, entry):
             f"authenticated branch {branch_id!r}."
         )
 
+    # Guard: HQ-owned catalogue is pull-only; a branch may not push it (§2.5).
+    if table_name in PULL_ONLY_TABLES:
+        raise EntryRejected(
+            f"{table_name} is HQ-owned catalogue and flows cloud -> branch "
+            f"only; a branch may not push it (§2.5)."
+        )
+
     try:
         with transaction.atomic():
             _, created = AppliedEntry.objects.get_or_create(
                 branch_id=str(branch_id),
                 outbox_id=outbox_id,
                 defaults={
-                    "table_name": entry["table_name"],
+                    "table_name": table_name,
                     "record_id": entry["record_id"],
                     "operation": entry["operation"],
                 },
@@ -177,9 +205,7 @@ def apply_entry(*, branch_id, entry):
             if not created:
                 return DUPLICATE
 
-            model = _model_for_table(entry["table_name"])
-            pk, field_map = deserialize_payload(model, payload)
-            _upsert(model, pk, field_map)
+            apply_payload(table_name, payload)
     except IntegrityError as exc:
         # Bad FK or constraint violation from the apply — permanent.
         raise EntryRejected(f"Integrity error: {exc}") from None

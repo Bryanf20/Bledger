@@ -7,6 +7,7 @@ Only push is here; pull (GET /sync/pull/) arrives in step 12.
 """
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from django.conf import settings
@@ -73,6 +74,31 @@ class CloudClient:
             # protocol/auth problem an operator fixes — never a signal to
             # discard queued writes. (Per-entry `rejected` outcomes come
             # back inside a 200 body, handled by the engine, not here.)
+            raise TransientSyncError(f"Cloud returned HTTP {exc.code}.") from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            raise TransientSyncError(f"Could not reach cloud: {exc}") from exc
+        except json.JSONDecodeError as exc:
+            raise TransientSyncError(f"Malformed cloud response: {exc}") from exc
+
+    def pull(self, since=None):
+        """
+        GET /api/v1/sync/pull/. `since` is the cloud clock from the last
+        successful contact (server_time); omit for a full catalogue
+        snapshot. Returns the parsed response dict ({records, server_time,
+        count}); raises TransientSyncError for anything retryable.
+        """
+        url = f"{self.base_url}/api/v1/sync/pull/"
+        if since:
+            url += "?since=" + urllib.parse.quote(since)
+        request = urllib.request.Request(
+            url,
+            method="GET",
+            headers={"Authorization": f"SyncToken {self.sync_token}"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
             raise TransientSyncError(f"Cloud returned HTTP {exc.code}.") from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise TransientSyncError(f"Could not reach cloud: {exc}") from exc

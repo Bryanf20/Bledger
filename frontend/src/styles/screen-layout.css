@@ -35,7 +35,9 @@
 .fin-page,
 .log-page,
 .set-page,
-.dash-page {
+.dash-page,
+.synch-page,
+.hq-page {
   height: 100vh;
   overflow: hidden;
   display: flex;
@@ -66,7 +68,9 @@
 .fin-screen,
 .log-screen,
 .set-screen,
-.dash-screen {
+.dash-screen,
+.synch-screen,
+.hq-screen {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -137,7 +141,9 @@
   .fin-page,
   .log-page,
   .set-page,
-  .dash-page {
+  .dash-page,
+  .synch-page,
+  .hq-page {
     padding-left: 0;
     padding-bottom: 56px;
   }

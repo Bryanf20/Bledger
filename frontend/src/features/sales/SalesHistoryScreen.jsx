@@ -114,10 +114,6 @@ export default function SalesHistoryScreen() {
           badge="Sales history"
           meta={
             <>
-              <span>
-                <span className="screen-sync-dot" />
-                Synced
-              </span>
               <span>{user?.branch?.branch_name}</span>
             </>
           }

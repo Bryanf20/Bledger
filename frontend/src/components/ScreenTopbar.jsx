@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import SyncStatusBadge from "./SyncStatusBadge";
 import ThemeToggle from "./ThemeToggle";
 import UserMenu from "./UserMenu";
 import "./ScreenTopbar.css";
@@ -53,6 +54,7 @@ export default function ScreenTopbar({ title, badge, meta }) {
         {badge && <span className="screen-topbar-badge">{badge}</span>}
       </div>
       <div className="screen-topbar-meta">
+        <SyncStatusBadge />
         {meta}
         <TopbarClock />
         <ThemeToggle />

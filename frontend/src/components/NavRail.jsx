@@ -44,6 +44,14 @@ const NAV_ITEMS = [
   // tiered server-side). Settings is owner-only (staff + business config).
   { to: "/logs", label: "Logs", icon: "📋", minimumRole: "manager" },
   { to: "/settings", label: "Settings", icon: "⚙️", minimumRole: "owner" },
+  // Sync health (Phase 2 §2.6): rejected-with-reasons + backlog. Owner-
+  // only, matching the IsOwner endpoint. Hidden entirely on standalone
+  // installs would be ideal, but the screen self-explains when sync is
+  // off, so a static owner item is fine for now.
+  // HQ multi-branch dashboard (Phase 2 §2.4). Owner-only, most useful in
+  // connected mode; on a single-branch install it just shows that branch.
+  { to: "/hq", label: "HQ", icon: "🏢", minimumRole: "owner" },
+  { to: "/sync-health", label: "Sync", icon: "🔄", minimumRole: "owner" },
 ];
 
 export default function NavRail() {

@@ -1,0 +1,40 @@
+/* Topbar connectivity indicator (Phase 2 §2.6). Same 7px dot as the old
+   .screen-sync-dot it replaces, now colour-coded per state, with a short
+   label beside it. */
+.sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.sync-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--color-text-tertiary);
+}
+
+.sync-badge-ok .sync-badge-dot {
+  background: var(--color-text-success);
+}
+
+.sync-badge-warn .sync-badge-dot {
+  background: var(--color-text-warning);
+}
+
+.sync-badge-err .sync-badge-dot {
+  background: var(--color-text-danger);
+}
+
+/* Standalone: a muted dot, no alarm — sync simply isn't in play. */
+.sync-badge-off {
+  color: var(--color-text-tertiary);
+}
+
+.sync-badge-off .sync-badge-dot {
+  background: var(--color-text-tertiary);
+}

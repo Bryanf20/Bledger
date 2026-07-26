@@ -278,15 +278,7 @@ export default function POSScreen() {
         <ScreenTopbar
           title="Bledger"
           badge="Point of sale"
-          meta={
-            <>
-              <span>
-                <span className="screen-sync-dot" />
-                Synced
-              </span>
-              <span>{user?.branch?.branch_name}</span>
-            </>
-          }
+          meta={<span>{user?.branch?.branch_name}</span>}
         />
 
         <div className="pos-body">

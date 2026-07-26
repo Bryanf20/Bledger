@@ -1,0 +1,97 @@
+/* Owner sync-health view (Phase 2 §2.6). .synch-page / .synch-screen height
+   chain also lives in styles/screen-layout.css's shared groups; duplicated
+   locally as the same belt-and-braces the other screens use. */
+
+.synch-page {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+}
+.synch-screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.synch-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.synch-summary {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.synch-stat {
+  flex: 1 1 140px;
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 10px 14px;
+  background: var(--color-background-secondary);
+}
+.synch-stat-value {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.synch-stat-value.warn {
+  color: var(--color-text-warning);
+}
+.synch-stat-value.err {
+  color: var(--color-text-danger);
+}
+.synch-stat-label {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
+.synch-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 16px 16px;
+}
+.synch-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin: 8px 0;
+}
+.synch-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--color-text-tertiary);
+}
+
+.synch-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+.synch-table th,
+.synch-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  vertical-align: top;
+}
+.synch-table th {
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+}
+.synch-reason {
+  color: var(--color-text-danger);
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  word-break: break-word;
+}

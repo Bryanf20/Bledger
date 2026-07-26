@@ -1,0 +1,134 @@
+/* HQ multi-branch dashboard (Phase 2 §2.4/§2.6). .hq-page / .hq-screen height
+   chain also lives in styles/screen-layout.css's shared groups; duplicated
+   locally as the same belt-and-braces the other screens use. */
+
+.hq-page {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+}
+.hq-screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.hq-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.hq-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px 0;
+  flex-shrink: 0;
+}
+.hq-period-toggle {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--color-background-secondary);
+  border-radius: var(--border-radius-md);
+  padding: 3px;
+}
+.hq-period-pill {
+  padding: 6px 14px;
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.hq-period-pill.active {
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.hq-stats {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.hq-stat {
+  flex: 1 1 160px;
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 12px 16px;
+  background: var(--color-background-secondary);
+}
+.hq-stat-value {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.hq-stat-label {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
+.hq-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 16px 16px;
+}
+.hq-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--color-text-tertiary);
+}
+
+.hq-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+.hq-table th,
+.hq-table td {
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.hq-table th {
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+  position: sticky;
+  top: 0;
+  background: var(--color-background-primary);
+}
+.hq-num {
+  text-align: right;
+}
+.hq-tag {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-success);
+  border: 0.5px solid var(--color-text-success);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+.hq-lastseen-ok {
+  color: var(--color-text-success);
+}
+.hq-lastseen-warn {
+  color: var(--color-text-warning);
+}
+.hq-lastseen-err {
+  color: var(--color-text-danger);
+}
+.hq-status-active {
+  color: var(--color-text-success);
+}
+.hq-status-inactive {
+  color: var(--color-text-tertiary);
+}
