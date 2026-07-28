@@ -9,7 +9,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 
 from apps.auth_users.models import Branch
-from apps.sync.management.commands.enrol_device import persist_enrolment
+from apps.sync.enrolment import persist_enrolment
 from apps.sync.models import EnrolmentCode
 
 
@@ -45,14 +45,15 @@ def test_provision_branch_rejects_duplicate_code():
 @pytest.mark.django_db
 def test_persist_enrolment_creates_local_branch_identity():
     branch = persist_enrolment({
-        "branch_id": "cloud-uuid-123",
+        "branch_id": "11111111-1111-1111-1111-111111111111",
         "sync_token": "tok-xyz",
         "code": "LMB",
         "business_name": "Tabi Provisions",
         "branch_name": "Limbe Branch",
         "is_hq": False,
     })
-    assert branch.cloud_id == "cloud-uuid-123"
+    assert branch.cloud_id == "11111111-1111-1111-1111-111111111111"
+    assert str(branch.id) == "11111111-1111-1111-1111-111111111111"
     assert branch.sync_token == "tok-xyz"
     assert branch.setup_complete is True
     assert branch.deployment_mode == Branch.DEPLOYMENT_CONNECTED
@@ -65,9 +66,9 @@ def test_persist_enrolment_updates_existing_branch():
         deployment_mode=Branch.DEPLOYMENT_STANDALONE, setup_complete=True,
     )
     branch = persist_enrolment({
-        "branch_id": "cloud-uuid-9", "sync_token": "tok-9", "code": "NEW",
+        "branch_id": "22222222-2222-2222-2222-222222222222", "sync_token": "tok-9", "code": "NEW",
         "business_name": "New Biz", "branch_name": "New Branch", "is_hq": True,
     })
     assert Branch.objects.count() == 1  # updated in place, not duplicated
-    assert branch.cloud_id == "cloud-uuid-9"
+    assert branch.cloud_id == "22222222-2222-2222-2222-222222222222"
     assert branch.is_hq is True

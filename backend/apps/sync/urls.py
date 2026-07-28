@@ -7,6 +7,7 @@ from django.urls import path
 
 from .views import (
     BranchProvisionView,
+    ConnectView,
     EnrolView,
     HealthView,
     PullView,
@@ -16,6 +17,7 @@ from .views import (
 
 urlpatterns = [
     path("enrol/", EnrolView.as_view(), name="sync-enrol"),
+    path("connect/", ConnectView.as_view(), name="sync-connect"),
     path("branches/", BranchProvisionView.as_view(), name="sync-branch-provision"),
     path("push/", PushView.as_view(), name="sync-push"),
     path("pull/", PullView.as_view(), name="sync-pull"),

@@ -60,16 +60,9 @@ class EntryRejected(Exception):
 _MODEL_BY_TABLE = {}
 
 
-def _model_for_table(table_name):
-    if table_name in NEVER_SYNCED:
-        raise EntryRejected(f"Table {table_name!r} is excluded from sync.")
-
-    # UnregisteredTableError => a table nobody classified; permanent.
-    try:
-        schema_version_for(table_name)
-    except UnregisteredTableError as exc:
-        raise EntryRejected(str(exc)) from None
-
+def _resolve_model(table_name):
+    """db_table -> model, with no sync-policy gate. Raises EntryRejected only
+    if nothing maps to the name."""
     model = _MODEL_BY_TABLE.get(table_name)
     if model is None:
         _MODEL_BY_TABLE.clear()
@@ -79,6 +72,24 @@ def _model_for_table(table_name):
     if model is None:
         raise EntryRejected(f"No model maps to table {table_name!r}.")
     return model
+
+
+def _model_for_table(table_name):
+    """Model for a PUSHED entry — gated by the push registry (§8.3/§8.4)."""
+    if table_name in NEVER_SYNCED:
+        raise EntryRejected(f"Table {table_name!r} is excluded from sync.")
+    try:
+        schema_version_for(table_name)
+    except UnregisteredTableError as exc:
+        raise EntryRejected(str(exc)) from None
+    return _resolve_model(table_name)
+
+
+def _unfiltered_manager(model):
+    """The manager that sees soft-deleted rows too. BaseModel exposes it as
+    all_objects; other models (BledgerUser, BusinessSettings) have no
+    soft-delete manager, so their _base_manager is already unfiltered."""
+    return getattr(model, "all_objects", None) or model._base_manager
 
 
 def _coerce(field, value):
@@ -135,7 +146,8 @@ def deserialize_payload(model, payload):
 
 def _upsert(model, pk, field_map):
     """Make the row equal the payload, without bumping BaseModel.version."""
-    updated = model.all_objects.filter(pk=pk).update(**field_map)
+    manager = _unfiltered_manager(model)
+    updated = manager.filter(pk=pk).update(**field_map)
     if updated:
         return
     # No existing row — insert. _state.adding stays True through this
@@ -150,15 +162,39 @@ def _upsert(model, pk, field_map):
         raise EntryRejected(f"Integrity error inserting {model._meta.db_table}: {exc}") from None
 
 
+# The cloud -> branch pull set (Phase 2 design §2.4): HQ-owned rows a branch
+# receives read-only. Note auth_users_* are NEVER_SYNCED for the *push*
+# direction (a branch may not push them up) yet are legitimately *pulled*
+# down — so pull resolves the model directly, bypassing the push registry
+# gate, and this allow-list is what keeps that safe.
+PULL_TABLES = {
+    "inventory_category",
+    "inventory_product",
+    "auth_users_bledgeruser",
+    "auth_users_businesssettings",
+}
+
+
 def apply_payload(table_name, payload):
     """
-    Resolve `table_name` to a model, deserialize `payload`, and upsert the
-    row. The shared core of both directions: push (branch -> cloud, wrapped
-    below with idempotency and ownership guards) and pull (cloud -> branch,
-    which calls this directly — pulls are naturally idempotent, a re-applied
-    row being a no-op upsert). Raises EntryRejected for permanent failures.
+    Resolve `table_name` to a model (push-gated), deserialize, upsert.
+    Used by push, which wraps it with idempotency and ownership guards.
+    Raises EntryRejected for permanent failures.
     """
     model = _model_for_table(table_name)
+    pk, field_map = deserialize_payload(model, payload)
+    _upsert(model, pk, field_map)
+
+
+def apply_pulled_record(table_name, payload):
+    """
+    Apply one cloud -> branch pulled record. Restricted to PULL_TABLES and
+    resolved without the push registry gate (so HQ-owned auth tables, which
+    are push-excluded, still apply on the way down). Idempotent upsert.
+    """
+    if table_name not in PULL_TABLES:
+        raise EntryRejected(f"{table_name} is not a pull-target table.")
+    model = _resolve_model(table_name)
     pk, field_map = deserialize_payload(model, payload)
     _upsert(model, pk, field_map)
 

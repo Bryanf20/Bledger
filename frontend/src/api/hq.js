@@ -9,3 +9,12 @@ export async function fetchHQSummary(period = "today") {
   const { data } = await apiClient.get("/hq/summary/", { params: { period } });
   return data;
 }
+
+// POST /hq/branches/ is not a thing — provisioning is the sync app's
+// owner-only endpoint (backend/apps/sync/views.py BranchProvisionView):
+//   POST /sync/branches/  { branch_name, code?, is_hq?, address?, phone? }
+//     -> { branch_id, branch_name, code, is_hq, enrolment_code, expires_at }
+export async function provisionBranch(payload) {
+  const { data } = await apiClient.post("/sync/branches/", payload);
+  return data;
+}

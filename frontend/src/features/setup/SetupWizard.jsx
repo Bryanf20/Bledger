@@ -6,6 +6,7 @@ import { extractErrorMessage } from "../../api/errors";
 import BusinessStep from "./BusinessStep";
 import TemplateStep from "./TemplateStep";
 import AccountStep from "./AccountStep";
+import ConnectStep from "./ConnectStep";
 import ThemeToggle from "../../components/ThemeToggle";
 import "./SetupWizard.css";
 
@@ -18,6 +19,10 @@ const STEPS = [
 export default function SetupWizard() {
   const { completeSetup } = useAuth();
   const navigate = useNavigate();
+
+  // null = choose a path; "new" = create a standalone business; "connect" =
+  // enrol this device as a branch of an existing business (Phase 2 §2.3).
+  const [mode, setMode] = useState(null);
 
   const [step, setStep] = useState(1);
   const [business, setBusiness] = useState(null);
@@ -50,8 +55,8 @@ export default function SetupWizard() {
         try {
           await loadTemplate(templateKey);
         } catch {
-          // Swallow -- owner can load a template later, or add
-          // products manually from Inventory. Not worth blocking on.
+          // Swallow -- owner can load a template later, or add products
+          // manually from Inventory. Not worth blocking on.
         }
       }
 
@@ -62,6 +67,14 @@ export default function SetupWizard() {
     }
   }
 
+  function handleConnected() {
+    // This device is now a branch: identity persisted, users + catalogue
+    // pulled. Send the manager to sign in with their (synced) account.
+    navigate("/login", { replace: true });
+  }
+
+  const subtitle = mode === "connect" ? "Connect to head office" : "First-time setup";
+
   return (
     <div className="wizard-page">
       <div className="wizard-shell">
@@ -70,25 +83,54 @@ export default function SetupWizard() {
             <div className="wiz-header-top">
               <div>
                 <span className="wiz-brand-name">Bledger</span>
-                <span className="wiz-brand-sub">First-time setup</span>
+                <span className="wiz-brand-sub">{subtitle}</span>
               </div>
               <ThemeToggle variant="on-brand" />
             </div>
-            <div className="wiz-steps-row">
-              {STEPS.map((s) => (
-                <div
-                  key={s.number}
-                  className={`wiz-step${s.number === step ? " active" : ""}${s.number < step ? " done" : ""}`}
-                >
-                  <div className="wiz-step-num">{s.number < step ? "✓" : s.number}</div>
-                  <div className="wiz-step-label">{s.label}</div>
-                </div>
-              ))}
-            </div>
+            {mode === "new" && (
+              <div className="wiz-steps-row">
+                {STEPS.map((s) => (
+                  <div
+                    key={s.number}
+                    className={`wiz-step${s.number === step ? " active" : ""}${s.number < step ? " done" : ""}`}
+                  >
+                    <div className="wiz-step-num">{s.number < step ? "✓" : s.number}</div>
+                    <div className="wiz-step-label">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="wiz-body">
-            {step === 1 && (
+            {mode === null && (
+              <>
+                <div className="wiz-step-title">Set up this device</div>
+                <div className="wiz-step-sub">
+                  Is this a brand-new business, or a branch of one you already run?
+                </div>
+                <div className="wiz-mode-choice">
+                  <button type="button" className="wiz-mode-card" onClick={() => setMode("new")}>
+                    <span className="wiz-mode-icon">🏪</span>
+                    <span className="wiz-mode-name">Set up a new business</span>
+                    <span className="wiz-mode-desc">A standalone shop that runs on this device.</span>
+                  </button>
+                  <button type="button" className="wiz-mode-card" onClick={() => setMode("connect")}>
+                    <span className="wiz-mode-icon">🏢</span>
+                    <span className="wiz-mode-name">Connect to head office</span>
+                    <span className="wiz-mode-desc">
+                      Join an existing business as a branch, using an enrolment code.
+                    </span>
+                  </button>
+                </div>
+              </>
+            )}
+
+            {mode === "connect" && (
+              <ConnectStep onBack={() => setMode(null)} onConnected={handleConnected} />
+            )}
+
+            {mode === "new" && step === 1 && (
               <>
                 <div className="wiz-step-title">Tell us about your business</div>
                 <div className="wiz-step-sub">This appears on receipts and reports.</div>
@@ -96,7 +138,7 @@ export default function SetupWizard() {
               </>
             )}
 
-            {step === 2 && (
+            {mode === "new" && step === 2 && (
               <TemplateStep
                 defaultTemplateKey={templateKey}
                 onBack={() => setStep(1)}
@@ -104,7 +146,7 @@ export default function SetupWizard() {
               />
             )}
 
-            {step === 3 && (
+            {mode === "new" && step === 3 && (
               <AccountStep
                 defaultValues={{}}
                 onBack={() => setStep(2)}
@@ -117,8 +159,8 @@ export default function SetupWizard() {
         </div>
 
         <p className="wiz-caption">
-          Bledger — First-run Setup Wizard, Step {step} of 3. Business details → Product
-          template selection → Owner account creation.
+          Bledger — First-run setup. Choose a new business or connect this device to head
+          office as a branch.
         </p>
       </div>
     </div>

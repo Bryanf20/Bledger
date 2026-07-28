@@ -3,7 +3,8 @@ import { useAuth } from "../../context/AuthContext";
 import Banner from "../../components/Banner";
 import ScreenTopbar from "../../components/ScreenTopbar";
 import XAFAmount from "../../components/XAFAmount";
-import { useHQSummary } from "../../hooks/useHQ";
+import { useHQSummary, useProvisionBranch } from "../../hooks/useHQ";
+import { extractErrorMessage } from "../../api/errors";
 import "./HQDashboardScreen.css";
 
 // HQ multi-branch dashboard (Phase 2 design §2.4/§2.6) — the owner-facing
@@ -43,6 +44,35 @@ export default function HQDashboardScreen() {
   const [period, setPeriod] = useState("today");
   const { data, isLoading, isError } = useHQSummary(period);
 
+  // Branch provisioning (owner). `form` open state, and `issued` holds the
+  // one-time enrolment code returned so it can be shown + copied once.
+  const provision = useProvisionBranch();
+  const [showForm, setShowForm] = useState(false);
+  const [branchName, setBranchName] = useState("");
+  const [branchCode, setBranchCode] = useState("");
+  const [isHQ, setIsHQ] = useState(false);
+  const [issued, setIssued] = useState(null);
+  const [formError, setFormError] = useState(null);
+
+  async function handleProvision(e) {
+    e.preventDefault();
+    setFormError(null);
+    try {
+      const result = await provision.mutateAsync({
+        branch_name: branchName.trim(),
+        code: branchCode.trim() || undefined,
+        is_hq: isHQ,
+      });
+      setIssued(result);
+      setShowForm(false);
+      setBranchName("");
+      setBranchCode("");
+      setIsHQ(false);
+    } catch (err) {
+      setFormError(extractErrorMessage(err, "Couldn\u2019t create the branch."));
+    }
+  }
+
   const branches = data?.branches ?? [];
 
   return (
@@ -72,7 +102,64 @@ export default function HQDashboardScreen() {
                   </div>
                 ))}
               </div>
+              <button
+                type="button"
+                className="hq-add-btn"
+                onClick={() => { setShowForm((v) => !v); setIssued(null); setFormError(null); }}
+              >
+                + Add branch
+              </button>
             </div>
+
+            {issued && (
+              <div className="hq-issued">
+                <div className="hq-issued-title">
+                  Branch “{issued.branch_name}” created ({issued.code})
+                </div>
+                <div className="hq-issued-row">
+                  <span className="hq-issued-label">Enrolment code</span>
+                  <code className="hq-issued-code">{issued.enrolment_code}</code>
+                  <button
+                    type="button"
+                    className="hq-copy-btn"
+                    onClick={() => navigator.clipboard?.writeText(issued.enrolment_code)}
+                  >
+                    Copy
+                  </button>
+                </div>
+                <div className="hq-issued-hint">
+                  On the new device run: <code>manage.py enrol_device --code {issued.enrolment_code}</code>
+                  {" "}— or use the setup wizard&apos;s “Connect to head office”. One-time use; expires soon.
+                </div>
+              </div>
+            )}
+
+            {showForm && (
+              <form className="hq-form" onSubmit={handleProvision}>
+                <input
+                  className="hq-input"
+                  placeholder="Branch name (e.g. Limbe Branch)"
+                  value={branchName}
+                  onChange={(e) => setBranchName(e.target.value)}
+                  required
+                />
+                <input
+                  className="hq-input hq-input-code"
+                  placeholder="Code (optional)"
+                  value={branchCode}
+                  onChange={(e) => setBranchCode(e.target.value.toUpperCase())}
+                  maxLength={8}
+                />
+                <label className="hq-checkbox">
+                  <input type="checkbox" checked={isHQ} onChange={(e) => setIsHQ(e.target.checked)} />
+                  Head office
+                </label>
+                <button type="submit" className="hq-add-btn" disabled={provision.isPending || !branchName.trim()}>
+                  {provision.isPending ? "Creating…" : "Create + get code"}
+                </button>
+                {formError && <span className="hq-form-error">{formError}</span>}
+              </form>
+            )}
 
             <div className="hq-stats">
               <div className="hq-stat">

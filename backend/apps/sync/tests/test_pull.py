@@ -211,3 +211,96 @@ def test_run_sync_cycle_runs_push_then_pull():
 
     push_outcome, pull_outcome = run_sync_cycle(client=BothCloud())
     assert pull_outcome == PULLED  # push had nothing, pull contacted cloud
+
+
+# ---------------------------------------------------------------------------
+# Users + business config (cloud -> branch, §2.4 / §7.2)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_pull_includes_branch_users(device_client, device_branch):
+    from apps.auth_users.models import BledgerUser
+
+    BledgerUser.objects.create_user(
+        username="cashier_lmb", branch=device_branch, role="cashier", pin="4321",
+        name="Cashier LMB",
+    )
+    body = device_client.get(PULL_URL).json()
+    user_recs = [r for r in body["records"] if r["table_name"] == "auth_users_bledgeruser"]
+    assert len(user_recs) == 1
+    assert user_recs[0]["payload"]["username"] == "cashier_lmb"
+    # branch_id is stamped with the cloud Branch id (FK the device resolves).
+    assert user_recs[0]["payload"]["branch_id"] == str(device_branch.id)
+
+
+@pytest.mark.django_db
+def test_pull_excludes_other_branches_users(device_client, device_branch):
+    from apps.auth_users.models import BledgerUser
+
+    other = Branch.objects.create(
+        business_name="X", branch_name="Other", phone="6", code="OTH",
+        deployment_mode=Branch.DEPLOYMENT_CONNECTED, setup_complete=True,
+    )
+    BledgerUser.objects.create_user(username="ours", branch=device_branch, role="cashier", pin="1111", name="Ours")
+    BledgerUser.objects.create_user(username="theirs", branch=other, role="cashier", pin="2222", name="Theirs")
+
+    body = device_client.get(PULL_URL).json()
+    usernames = {r["payload"]["username"] for r in body["records"] if r["table_name"] == "auth_users_bledgeruser"}
+    assert usernames == {"ours"}
+
+
+@pytest.mark.django_db
+def test_pull_includes_business_settings(device_client):
+    from apps.auth_users.models import BusinessSettings
+
+    BusinessSettings.load()  # ensure the singleton exists
+    body = device_client.get(PULL_URL).json()
+    settings_recs = [r for r in body["records"] if r["table_name"] == "auth_users_businesssettings"]
+    assert len(settings_recs) == 1
+    assert settings_recs[0]["payload"]["id"] == 1
+
+
+@pytest.mark.django_db
+def test_run_pull_cycle_applies_a_user_with_branch_fk():
+    from apps.auth_users.models import BledgerUser, Branch as B
+
+    # The device's local Branch uses the cloud branch id as its pk (enrolment
+    # aligns them), so a pulled user's branch_id resolves.
+    cloud_bid = "33333333-3333-3333-3333-333333333333"
+    B.objects.create(
+        id=cloud_bid, cloud_id=cloud_bid, business_name="Tabi", branch_name="LMB",
+        code="LMB", deployment_mode=B.DEPLOYMENT_CONNECTED, setup_complete=True,
+    )
+    uid = "44444444-4444-4444-4444-444444444444"
+    response = {
+        "records": [{
+            "table_name": "auth_users_bledgeruser", "operation": "update",
+            "payload": {
+                "id": uid, "branch_id": cloud_bid, "username": "pulled_user",
+                "name": "Pulled User", "role": "cashier", "pin_hash": "",
+                "password": "!", "is_active": True, "is_staff": False,
+                "is_superuser": False, "last_login": None,
+            },
+        }],
+        "server_time": "2026-07-24T12:00:00Z",
+    }
+    assert run_pull_cycle(client=FakeCloud(response=response)) == PULLED
+    u = BledgerUser.objects.get(pk=uid)
+    assert u.username == "pulled_user"
+    assert u.branch_id == B.objects.get(pk=cloud_bid).id
+
+
+@pytest.mark.django_db
+def test_run_pull_cycle_applies_business_settings():
+    from apps.auth_users.models import BusinessSettings
+
+    response = {
+        "records": [{
+            "table_name": "auth_users_businesssettings", "operation": "update",
+            "payload": {"id": 1, "default_credit_limit": 25000},
+        }],
+        "server_time": "2026-07-24T12:00:00Z",
+    }
+    assert run_pull_cycle(client=FakeCloud(response=response)) == PULLED
+    assert BusinessSettings.objects.get(pk=1).default_credit_limit == 25000

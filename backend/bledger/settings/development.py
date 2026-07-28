@@ -4,7 +4,7 @@ to the React dev server. This is what you run day-to-day while building;
 `standalone.py` is the equivalent settings module baked into a packaged
 release.
 """
-from .base import *  # noqa: F401,F403
+from .base import *
 from .base import BASE_DIR, INSTALLED_APPS, MIDDLEWARE, env
 
 DEBUG = True

@@ -3,7 +3,7 @@ Test runner settings. Inherits base — in-memory SQLite, fast password
 hasher, sync disabled. Used by pytest-django via DJANGO_SETTINGS_MODULE
 in pytest.ini / pyproject.toml.
 """
-from .base import *  # noqa: F401,F403
+from .base import *
 
 DEBUG = False
 

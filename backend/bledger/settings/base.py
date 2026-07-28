@@ -8,7 +8,7 @@ standalone.py / connected.py.
 """
 from pathlib import Path
 
-import environ # type: ignore
+import environ  # type: ignore
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent  # .../backend
 

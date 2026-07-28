@@ -17,7 +17,7 @@ The device's own identity (branch_id) and sync_token are NOT set here — a
 branch reads them from its local Branch row after enrolment (§2.3), so
 BRANCH_ID stays at its harmless env default until the device enrols.
 """
-from .base import *  # noqa: F401,F403
+from .base import *
 from .base import BASE_DIR, env
 
 DEBUG = env.bool("DJANGO_DEBUG", default=False)

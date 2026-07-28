@@ -22,9 +22,11 @@ from rest_framework.views import APIView
 
 from apps.auth_users.models import Branch, derive_branch_code, generate_sync_token
 from apps.core.permissions import IsCashierOrAbove, IsOwner
+from apps.auth_users.models import BusinessSettings
 from apps.inventory.models import HQ_BRANCH_ID, Category, Product
 
 from .apply import APPLIED, DUPLICATE, REJECTED, EntryRejected, apply_entry
+from .enrolment import EnrolmentError, call_enrol, persist_enrolment
 from .authentication import DeviceSyncTokenAuthentication
 from .models import EnrolmentCode, OutboxEntry, SyncState
 from .permissions import IsEnrolledDevice
@@ -302,6 +304,35 @@ class PullView(APIView):
                     }
                 )
 
+        # This branch's user accounts (HQ-owned; flow cloud -> branch, §2.4).
+        # request.auth is the calling branch. Emitted after catalogue so the
+        # branch's Branch row (created at enrolment) already exists for the FK.
+        users = request.auth.users.all()
+        if since is not None:
+            users = users.filter(updated_at__gt=since)
+        for user in users.order_by("updated_at"):
+            records.append(
+                {
+                    "table_name": user._meta.db_table,
+                    "operation": "update",
+                    "payload": serialize_instance(user),
+                }
+            )
+
+        # Business-wide policy config (singleton, HQ-owned, read-only on
+        # branches — §7.2). Shared by every branch.
+        settings_qs = BusinessSettings.objects.all()
+        if since is not None:
+            settings_qs = settings_qs.filter(updated_at__gt=since)
+        for row in settings_qs:
+            records.append(
+                {
+                    "table_name": row._meta.db_table,
+                    "operation": "update",
+                    "payload": serialize_instance(row),
+                }
+            )
+
         return Response(
             {
                 "records": records,
@@ -359,4 +390,59 @@ class HealthView(APIView):
                 "consecutive_failures": state.consecutive_failures if state else 0,
                 "last_error": state.last_error if state else None,
             }
+        )
+
+
+class ConnectView(APIView):
+    """
+    POST /api/v1/sync/connect/ — the DEVICE-side "Connect to head office"
+    action (Phase 2 design §2.3). Runs on the branch device (pre-setup, so no
+    auth): takes a one-time code (and optionally the cloud URL), redeems it
+    against the cloud's /sync/enrol/, persists the returned identity into the
+    local Branch row, and kicks an immediate pull so users and catalogue land
+    before the manager logs in. This is what the setup wizard's connect path
+    calls; `enrol_device` is the CLI equivalent.
+    """
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        code = (request.data.get("code") or "").strip().upper()
+        cloud_url = (request.data.get("cloud_url") or getattr(settings, "CLOUD_API_BASE_URL", "")).strip()
+        if not code:
+            return Response({"detail": "An enrolment code is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not cloud_url:
+            return Response(
+                {"detail": "No head-office URL. Provide cloud_url or set CLOUD_API_BASE_URL."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            data = call_enrol(cloud_url, code)
+        except EnrolmentError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        branch = persist_enrolment(data)
+
+        # Best-effort immediate pull so the device has its users + catalogue
+        # right away; if the cloud is momentarily unreachable the scheduled
+        # sync cycle will catch up, so a failure here doesn't fail connect.
+        try:
+            from .cloud_client import CloudClient
+            from .engine import run_pull_cycle
+
+            run_pull_cycle(client=CloudClient(cloud_url, branch.sync_token), respect_backoff=False)
+        except Exception:  # noqa: BLE001 - never block enrolment on the warm-up pull
+            pass
+
+        return Response(
+            {
+                "branch_id": str(branch.id),
+                "branch_name": branch.branch_name,
+                "business_name": branch.business_name,
+                "code": branch.code,
+                "is_hq": branch.is_hq,
+            },
+            status=status.HTTP_200_OK,
         )

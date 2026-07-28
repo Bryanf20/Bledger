@@ -12,7 +12,7 @@ from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
-from .apply import EntryRejected, apply_payload
+from .apply import EntryRejected, apply_pulled_record
 from .cloud_client import TransientSyncError
 from .models import OutboxEntry, SyncState
 
@@ -202,7 +202,7 @@ def run_pull_cycle(*, client, now=None, respect_backoff=True):
             # surfaced via last_error rather than stalling the whole pull.
             try:
                 with transaction.atomic():
-                    apply_payload(record["table_name"], record["payload"])
+                    apply_pulled_record(record["table_name"], record["payload"])
             except EntryRejected:
                 continue
 

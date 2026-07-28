@@ -10,7 +10,7 @@ Mode 2 — Standalone (fully local). Inherits base.
 This is the settings module baked into the Tauri-wrapped desktop build
 (Phase 3) and used for any business with no internet access today.
 """
-from .base import *  # noqa: F401,F403
+from .base import *
 from .base import BASE_DIR, env
 
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
