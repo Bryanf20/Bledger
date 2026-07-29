@@ -51,6 +51,12 @@ def _token_response(user, status_code=status.HTTP_200_OK):
 class LoginView(APIView):
     """POST /api/v1/auth/login/ — username + password (owner, manager)."""
 
+    # No authenticators: this endpoint establishes identity from the request
+    # body, so it must not run SessionAuthentication — which would enforce CSRF
+    # (and 403 "CSRF token missing") whenever a stale Django session cookie is
+    # present, e.g. from /admin/ or a prior login. DRF APIViews are csrf_exempt
+    # from Django's middleware, so with no session auth there is no CSRF here.
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -65,6 +71,9 @@ class LoginView(APIView):
 class PinLoginView(APIView):
     """POST /api/v1/auth/pin-login/ — 4-digit PIN (cashier)."""
 
+    # See LoginView: no session auth on a credential endpoint, so a stale
+    # session cookie can't trigger CSRF enforcement on PIN login.
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -194,6 +203,9 @@ class SetupView(APIView):
     in one call.
     """
 
+    # See LoginView: credential/bootstrap endpoint — no session auth, so first-run
+    # setup can't be blocked by a stale session cookie's CSRF check.
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):

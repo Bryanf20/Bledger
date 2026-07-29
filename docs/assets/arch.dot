@@ -1,0 +1,38 @@
+digraph arch {
+  rankdir=TB; bgcolor="white";
+  graph [fontname="Helvetica", fontsize=11, ranksep=0.6, nodesep=0.35];
+  node  [fontname="Helvetica", fontsize=10, style="filled", color="#1f2937", penwidth=1];
+  edge  [fontname="Helvetica", fontsize=9, color="#374151"];
+
+  subgraph cluster_client {
+    label="Client — React 19 SPA (Vite)"; style="rounded,filled"; fillcolor="#eef2ff"; color="#6366f1";
+    ui   [label="Feature screens\nPOS · Inventory · Sales · Suppliers\nCustomers · Finances · Dashboard · HQ · Sync", fillcolor="#c7d2fe"];
+    state[label="React Query (server cache)\nZustand (POS cart) · Contexts (auth, theme)", fillcolor="#e0e7ff"];
+    apicl[label="axios client\nAuthorization: Token · 401 interceptor", fillcolor="#e0e7ff"];
+    ui->state[style=invis]; state->apicl[style=invis];
+  }
+
+  subgraph cluster_api {
+    label="Backend — Django 6.0 + DRF   (/api/v1/)"; style="rounded,filled"; fillcolor="#ecfdf5"; color="#10b981";
+    mw   [label="DeploymentContextMiddleware\nstamps request.branch_id", fillcolor="#a7f3d0"];
+    perm [label="Role permissions\nowner > manager > cashier", fillcolor="#d1fae5"];
+    apps [label="12 apps: core · auth_users · inventory · sales\nsuppliers · customers · finances · activity\nprinting · dashboard · sync", fillcolor="#d1fae5"];
+    mw->perm[style=invis]; perm->apps[style=invis];
+  }
+
+  subgraph cluster_svc {
+    label="Cross-cutting"; style="rounded,filled"; fillcolor="#fff7ed"; color="#f59e0b";
+    printing[label="printing\ndict-in / bytes-out\nWeasyPrint 80mm PDF", fillcolor="#fed7aa"];
+    sync    [label="sync engine\noutbox · push/pull · idempotency", fillcolor="#fed7aa"];
+  }
+
+  db     [label="Local DB — SQLite\n(standalone / branch device)", shape=cylinder, fillcolor="#fde68a"];
+  cloud  [label="Cloud DB — PostgreSQL\n(connected / HQ)", shape=cylinder, fillcolor="#fca5a5"];
+
+  apicl -> mw [label="HTTPS  JSON"];
+  apps -> printing [label="build receipt dict"];
+  apps -> db [label="ORM  (select_for_update)"];
+  apps -> sync [label="write_outbox_entry\n(same txn)"];
+  sync -> cloud [label="push outbox / pull catalogue\n(SyncToken, background)", style=dashed, color="#dc2626"];
+  sync -> db [style=dashed];
+}

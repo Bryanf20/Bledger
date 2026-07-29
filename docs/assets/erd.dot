@@ -1,0 +1,45 @@
+digraph erd {
+  rankdir=LR; bgcolor="white"; splines=spline; overlap=false;
+  graph [fontname="Helvetica", fontsize=11, ranksep=0.7, nodesep=0.3];
+  node  [fontname="Helvetica", fontsize=9, shape=record, style="filled", fillcolor="#f8fafc", color="#334155"];
+  edge  [fontname="Helvetica", fontsize=8, color="#475569", arrowhead=crow, arrowtail=none, dir=both, arrowsize=0.8];
+
+  Branch     [label="{Branch|id (uuid)\lbusiness_name\lcode (uniq)\lis_hq · cloud_id\lsync_token · deployment_mode}", fillcolor="#e0e7ff"];
+  User       [label="{BledgerUser|id · branch(fk)\lusername · role\lpassword · pin_hash}", fillcolor="#e0e7ff"];
+  BizSet     [label="{BusinessSettings|singleton (pk=1)\ldiscount/surplus/credit\lmargin_alert_pct}", fillcolor="#e0e7ff"];
+
+  Category   [label="{Category|id · branch_id\lname (uniq/branch)\lsort_order}", fillcolor="#dcfce7"];
+  Product    [label="{Product|id · category(fk)\lretail/bulk_price\lstock_level · barcode\laverage_cost · is_active}", fillcolor="#dcfce7"];
+  Override   [label="{BranchPriceOverride|product(fk) · branch_id\lprice overrides}", fillcolor="#dcfce7"];
+  StockAdj   [label="{StockAdjustment|product(fk) · type\lquantity · reason\lstock_before/after}", fillcolor="#dcfce7"];
+
+  Sale       [label="{Sale|id · cashier(fk)\lcustomer(fk?) · reference(uniq)\lpayment_method · total\lstatus · voided_by}", fillcolor="#fee2e2"];
+  SaleLine   [label="{SaleLineItem|sale(fk) · product(fk)\lqty · catalogue/actual_price\lvariance · line_total}", fillcolor="#fee2e2"];
+  Held       [label="{HeldSale|cashier(fk)\llabel · cart_data(json)}", fillcolor="#fee2e2"];
+
+  Supplier   [label="{Supplier|id · name\lphone · area · is_active}", fillcolor="#ffedd5"];
+  Purchase   [label="{Purchase|supplier(fk) · total\lamount_paid · payment_status\lpurchase_order(fk?)}", fillcolor="#ffedd5"];
+  PurchLine  [label="{PurchaseLineItem|purchase(fk) · product(fk)\lqty · unit_cost}", fillcolor="#ffedd5"];
+  PurchPay   [label="{PurchasePayment|purchase(fk)\lamount · recorded_by}", fillcolor="#ffedd5"];
+  PO         [label="{PurchaseOrder|supplier(fk)\lstatus · created_by}", fillcolor="#ffedd5"];
+  POLine     [label="{PurchaseOrderLineItem|purchase_order(fk) · product(fk)\lqty_ordered/received}", fillcolor="#ffedd5"];
+
+  Customer   [label="{Customer|id · name · phone\lcredit_limit}", fillcolor="#f3e8ff"];
+  CustPay    [label="{CustomerPayment|customer(fk)\lamount · method}", fillcolor="#f3e8ff"];
+
+  ExpCat     [label="{ExpenseCategory|name · is_active}", fillcolor="#cffafe"];
+  Cashbook   [label="{CashbookEntry|direction · amount\lcategory(fk?) · source_adjustment(fk?)}", fillcolor="#cffafe"];
+  Activity   [label="{ActivityLog|action · summary\lactor(fk) · target · metadata}", fillcolor="#e2e8f0"];
+
+  Outbox     [label="{OutboxEntry|table_name · record_id\loperation · payload(json)\lschema_version · synced/rejected_at}", fillcolor="#fecaca"];
+  Enrol      [label="{EnrolmentCode|code · branch(fk)\lexpires_at · consumed_at}", fillcolor="#fecaca"];
+  Applied    [label="{AppliedEntry|branch_id · outbox_id\l(unique together)}", fillcolor="#fecaca"];
+  SyncState  [label="{SyncState|singleton · locked_at\lbackoff · last_server_time}", fillcolor="#fecaca"];
+
+  Branch->User; Branch->Enrol;
+  Category->Product; Product->Override; Product->StockAdj;
+  User->Sale [label="cashier"]; Customer->Sale [label="customer"]; Sale->SaleLine; Product->SaleLine; User->Held;
+  Supplier->Purchase; Purchase->PurchLine; Product->PurchLine; Purchase->PurchPay; Supplier->PO; PO->POLine; Product->POLine; PO->Purchase [style=dashed,label="receive"];
+  Customer->CustPay;
+  ExpCat->Cashbook; StockAdj->Cashbook [style=dashed];
+}

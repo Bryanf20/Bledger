@@ -3,17 +3,16 @@ Root URL configuration.
 
 Each app owns its own urls.py and is mounted here under /api/v1/.
 """
-from django.apps import apps
-from django.conf import settings
-from django.contrib import admin
-from django.urls import include, path
-
 from apps.auth_users.urls import (
     auth_urlpatterns,
     settings_urlpatterns,
     setup_urlpatterns,
     user_urlpatterns,
 )
+from django.apps import apps
+from django.conf import settings
+from django.contrib import admin
+from django.urls import include, path
 
 urlpatterns = [
     path("admin/", admin.site.urls),

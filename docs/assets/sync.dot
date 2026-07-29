@@ -1,0 +1,45 @@
+digraph sync {
+  rankdir=TB; bgcolor="white";
+  graph [fontname="Helvetica", fontsize=11, ranksep=0.45, nodesep=0.5];
+  node  [fontname="Helvetica", fontsize=10, shape=box, style="rounded,filled", penwidth=1, width=3.2];
+  edge  [fontname="Helvetica", fontsize=9];
+
+  // legend / headers
+  hCloud  [label="◆ CLOUD / HQ  (PostgreSQL, connected.py)", fillcolor="#fca5a5", color="#b91c1c", width=3.6];
+  hDevice [label="◆ BRANCH DEVICE  (SQLite, branch.py)", fillcolor="#bfdbfe", color="#1d4ed8", width=3.6];
+  { rank=same; hCloud; hDevice; }
+
+  // enrolment
+  e1 [label="1. provision_branch --branch-name --code\n→ creates Branch + one-time EnrolmentCode", fillcolor="#fee2e2"];
+  e2 [label="2. enrol_device --code <CODE>\nPOST /sync/enrol/", fillcolor="#dbeafe"];
+  e3 [label="3. Cloud validates & consumes code\nreturns canonical branch_id + sync_token", fillcolor="#fee2e2"];
+  e4 [label="4. Device sets local Branch.pk = cloud branch_id\nstores cloud_id + sync_token (write-only)", fillcolor="#dbeafe"];
+
+  // push
+  p1 [label="5. Every write appends OutboxEntry\nin the same transaction (offline-safe)", fillcolor="#dbeafe"];
+  p2 [label="6. manage.py sync (cron) → run_push_cycle\nPOST /sync/push/  (Authorization: SyncToken)", fillcolor="#dbeafe"];
+  p3 [label="7. Cloud apply_entry: idempotency guard\nAppliedEntry unique(branch_id, outbox_id)\nupsert-by-pk, version preserved", fillcolor="#fee2e2"];
+  p4 [label="8. Results per entry → outbox marked\nsynced_at / rejected_at(+reason)", fillcolor="#dbeafe"];
+
+  // pull
+  l1 [label="9. run_pull_cycle → GET /sync/pull/?since=…", fillcolor="#dbeafe"];
+  l2 [label="10. Cloud returns HQ catalogue changes\n+ tombstones (PULL_TABLES allow-list)", fillcolor="#fee2e2"];
+  l3 [label="11. apply_pulled_record (read-only upsert)\ncatalogue + users + BusinessSettings", fillcolor="#dbeafe"];
+
+  edge [color="#111827"];
+  hDevice -> e1 [style=invis];
+  e1 -> e2 [label=" enrolment code (out-of-band)", color="#b91c1c", style=dashed];
+  e2 -> e3 [label=" network", color="#2563eb", style=dashed];
+  e3 -> e4 [label=" response", color="#b91c1c", style=dashed];
+  e4 -> p1 [color="#111827"];
+  p1 -> p2 [color="#111827"];
+  p2 -> p3 [label=" push (network)", color="#2563eb", style=dashed];
+  p3 -> p4 [label=" results", color="#b91c1c", style=dashed];
+  p4 -> l1 [color="#111827"];
+  l1 -> l2 [label=" pull (network)", color="#2563eb", style=dashed];
+  l2 -> l3 [label=" catalogue + tombstones", color="#b91c1c", style=dashed];
+
+  note [shape=note, fillcolor="#fef9c3", color="#ca8a04", width=3.4,
+        label="Run lock (atomic UPDATE) + exponential backoff 30s→~15min.\nAll 4xx/5xx treated transient — queued writes never dropped.\nBranches never share editable rows; catalogue is the one shared, read-only layer."];
+  l3 -> note [style=invis];
+}

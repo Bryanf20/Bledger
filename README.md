@@ -113,12 +113,14 @@ suppliers and purchases, and the owner dashboard. SQLite only, PDF receipts,
 English. Sale line items store catalogue price, actual price, and variance from
 day one so negotiated pricing needs no migration later.
 
-### Phase 2 — Cloud, sync & haggling ◐ In design
+### Phase 2 — Cloud, sync & haggling - Complete
 
-PostgreSQL and the outbox sync engine. Mode 1 goes live with multi-branch
-deployment and an aggregated HQ dashboard. Negotiated pricing UI with floor and
-ceiling controls, PIN approval, and variance reporting. Customer accounts and
-credit. Barcode scanning. A full settings module.
+PostgreSQL and the outbox sync engine (push, pull, enrolment, idempotency). Mode
+1 is live with multi-branch deployment and an aggregated HQ dashboard. Negotiated
+pricing with floor/ceiling controls, PIN approval, and variance reporting.
+Customer accounts and credit. Suppliers gain purchase orders. Barcode scanning
+(USB and camera). Expenses/cashbook and P&L. Activity logging. A full settings
+module.
 
 ### Phase 3 — Desktop app
 
@@ -141,37 +143,35 @@ contributed product templates.
 
 ## Current status
 
-> **Phase 1 is complete. Phase 2 is designed and awaiting implementation.**
+> **Phase 1 and all of Phase 2 (Stages 1–4) are shipped. Phase 3 is next.**
 
-**Shipped (Phase 1)**
+**Shipped**
 
-- All 8 backend apps: `core`, `auth_users`, `inventory`, `sales`, `printing`,
-  `suppliers`, `dashboard`, and the `sync` scaffold.
-- All 7 screens: Login/PIN, Setup Wizard, POS, Receipt, Inventory, Sales
-  History, Suppliers & Purchases, plus the Owner Dashboard and a persistent
-  navigation rail.
-- Light and dark themes, toast notifications, role-aware routing.
-- Supplier payment ledger, purchase payment tracking, supplier
-  deactivation/reactivation.
+- All 12 backend apps: `core`, `auth_users`, `inventory`, `sales`, `printing`,
+  `suppliers`, `customers`, `finances`, `activity`, `dashboard`, and the full
+  `sync` engine.
+- Standalone mode (Mode 2) and connected multi-branch mode (Mode 1) from one
+  codebase, with a cloud/HQ deploy on Railway + PostgreSQL.
+- The sync engine end to end: outbox push, catalogue pull, one-time device
+  enrolment, cloud-side idempotency, run lock + exponential backoff.
+- Negotiated pricing with floor/ceiling and PIN approval; customer accounts and
+  credit; purchase orders; barcode scanning (USB + camera); expenses/cashbook and
+  P&L; activity logging; the HQ and Sync-health screens.
+- Light and dark themes, toast notifications, role-aware routing, a persistent
+  navigation rail, and a live sync-status badge.
 
-**Not yet built**
+**Resolved Phase 2 blockers** (once tracked in `docs/PHASE2_DESIGN.md`):
 
-- The sync engine itself. `OutboxEntry` and the outbox writer exist and are
-  wired into most mutations, but nothing drains the queue yet — by design, since
-  Phase 1 targets standalone deployment.
-- Outbox coverage is deliberately incomplete: product create/edit and category
-  writes do not yet emit outbox entries. This is tracked as blocking work for
-  Phase 2.
-- Everything else in Phase 2 and beyond.
+- `Sale.reference` now carries a branch discriminator (`BLD-<code>-<year>-<seq>`),
+  so branches don't collide in a shared database.
+- The outbox payload now has a versioned serialization contract
+  (`schema_version`), enforced by a registry that fails the build on any
+  unclassified model.
 
-**Known Phase 2 blockers**, documented in
-[`docs/PHASE2_DESIGN.md`](docs/PHASE2_DESIGN.md):
+**Next (Phase 3)**
 
-- `Sale.reference` is globally unique but generated per-install, so branches
-  would collide in a shared database. Needs a branch discriminator.
-- The outbox payload has no versioned serialization contract.
-- Customer credit needs an architectural decision on whether customers are
-  scoped per branch or shared across them.
+- Tauri desktop packaging, thermal ESC/POS printing (a config switch), Mobile
+  Money API integration, and a USB update mechanism. See the roadmap above.
 
 ## Quick start
 
@@ -222,6 +222,7 @@ npm run lint
 |---|---|---|
 | `development` | SQLite | Local development, CORS open to the Vite dev server |
 | `standalone` | SQLite | Mode 2 production — sync disabled |
+| `branch` | SQLite | Mode 1 branch device — SQLite locally, sync enabled |
 | `connected` | PostgreSQL | Mode 1 cloud server — sync enabled |
 | `production` | PostgreSQL | Inherits `connected`, adds security hardening |
 | `testing` | In-memory SQLite | Fast test runs |
@@ -235,13 +236,16 @@ backend/
     urls.py              mounts every app under /api/v1/
   apps/
     core/                BaseModel, permissions, pagination, middleware, XAF helpers
-    auth_users/          Branch, BledgerUser, login/PIN auth, setup wizard
+    auth_users/          Branch, BledgerUser, BusinessSettings, login/PIN, setup wizard
     inventory/           products, categories, stock adjustments, price overrides, templates
     sales/               POS sales, line items, held sales, voids, receipt data
     printing/            printer abstraction — PDF now, thermal in Phase 3
-    suppliers/           supplier directory, purchases, payment ledger
-    dashboard/           aggregates, KPIs, reports
-    sync/                outbox model and writer — engine lands in Phase 2
+    suppliers/           supplier directory, purchases, payment ledger, purchase orders
+    customers/           customer directory, credit, payment ledger
+    finances/            expense categories, cashbook, P&L
+    activity/            activity log
+    dashboard/           aggregates, KPIs, reports, HQ rollup
+    sync/                full engine: outbox push/pull, enrolment, idempotency
 frontend/
   src/
     api/                 axios client, one module per backend app
