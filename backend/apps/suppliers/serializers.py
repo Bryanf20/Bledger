@@ -37,7 +37,14 @@ from apps.inventory.services import weighted_average_cost
 from apps.sync.models import OutboxEntry
 from apps.sync.utils import write_outbox_entry
 
-from .models import Purchase, PurchaseLineItem, PurchasePayment, Supplier
+from .models import (
+    Purchase,
+    PurchaseLineItem,
+    PurchaseOrder,
+    PurchaseOrderLineItem,
+    PurchasePayment,
+    Supplier,
+)
 
 
 class SupplierSerializer(serializers.ModelSerializer):
@@ -323,4 +330,171 @@ class RecordPurchasePaymentSerializer(serializers.Serializer):
             write_outbox_entry(instance=locked_purchase, operation=OutboxEntry.UPDATE, branch_id=locked_purchase.branch_id)
 
         return locked_purchase
-    
+
+
+class PurchaseOrderLineItemSerializer(serializers.ModelSerializer):
+    """Read-side nested line — includes derived line_total / outstanding."""
+
+    product_name = serializers.SerializerMethodField()
+    line_total = serializers.IntegerField(read_only=True)
+    outstanding = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = PurchaseOrderLineItem
+        fields = [
+            "id", "product", "product_name", "quantity_ordered",
+            "quantity_received", "outstanding", "unit_cost", "line_total",
+        ]
+
+    def get_product_name(self, line):
+        return line.product_name or line.product.name
+
+
+class PurchaseOrderLineInputSerializer(serializers.Serializer):
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+    quantity_ordered = serializers.IntegerField(min_value=1)
+    unit_cost = serializers.IntegerField(min_value=0)
+
+
+class PurchaseOrderSerializer(serializers.ModelSerializer):
+    line_items = PurchaseOrderLineItemSerializer(many=True, read_only=True)
+    items = PurchaseOrderLineInputSerializer(many=True, write_only=True)
+    supplier_name = serializers.CharField(source="supplier.name", read_only=True)
+    created_by_name = serializers.CharField(source="created_by.name", read_only=True)
+    total_ordered_amount = serializers.IntegerField(read_only=True)
+    # receipts (fulfilling Purchases) are readable so the detail view can show
+    # what has been received against this PO.
+    receipt_ids = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PurchaseOrder
+        fields = [
+            "id", "supplier", "supplier_name", "order_date", "expected_date",
+            "status", "notes", "created_by", "created_by_name",
+            "total_ordered_amount", "line_items", "items", "receipt_ids",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id", "status", "created_by", "created_by_name",
+            "total_ordered_amount", "line_items", "receipt_ids", "created_at",
+        ]
+
+    def get_receipt_ids(self, po):
+        return [str(p.id) for p in po.receipts.all()]
+
+    def validate(self, attrs):
+        if not attrs.get("items"):
+            raise serializers.ValidationError({"items": "A purchase order needs at least one line."})
+        supplier = attrs.get("supplier")
+        if supplier is not None and not supplier.is_active:
+            raise serializers.ValidationError(
+                {"supplier": "This supplier is deactivated — reactivate it before ordering."}
+            )
+        # A PO may be created as a draft or sent straight away.
+        initial = self.initial_data.get("status")
+        if initial not in (None, PurchaseOrder.DRAFT, PurchaseOrder.SENT):
+            raise serializers.ValidationError({"status": "A new PO may only be draft or sent."})
+        return attrs
+
+    def create(self, validated_data):
+        items_data = validated_data.pop("items")
+        request = self.context["request"]
+        branch_id = request.branch_id
+        status_value = self.initial_data.get("status") or PurchaseOrder.DRAFT
+
+        with transaction.atomic():
+            po = PurchaseOrder.objects.create(
+                branch_id=branch_id,
+                created_by=request.user,
+                status=status_value,
+                **validated_data,
+            )
+            for item in items_data:
+                product = item["product"]
+                line = PurchaseOrderLineItem.objects.create(
+                    branch_id=branch_id,
+                    purchase_order=po,
+                    product=product,
+                    product_name=product.name,
+                    quantity_ordered=item["quantity_ordered"],
+                    unit_cost=item["unit_cost"],
+                )
+                write_outbox_entry(instance=line, operation=OutboxEntry.INSERT, branch_id=branch_id)
+            write_outbox_entry(instance=po, operation=OutboxEntry.INSERT, branch_id=branch_id)
+
+        return po
+
+
+class ReceivePurchaseOrderSerializer(serializers.Serializer):
+    """
+    Receive goods against a PO (§6.2). Input: which lines arrived and how many,
+    plus optional payment. Creates a normal Purchase — reusing PurchaseSerializer,
+    the single stock-moving path — links it to the PO, advances each line's
+    quantity_received, and re-derives PO status. Partial receipt is the norm.
+    """
+
+    class _ReceiptLine(serializers.Serializer):
+        line = serializers.PrimaryKeyRelatedField(queryset=PurchaseOrderLineItem.objects.all())
+        quantity = serializers.IntegerField(min_value=1)
+
+    receipts = _ReceiptLine(many=True)
+    purchase_date = serializers.DateField(required=False)
+    amount_paid = serializers.IntegerField(min_value=0, required=False, default=0)
+
+    def validate(self, attrs):
+        po = self.context["purchase_order"]
+        if not po.is_open:
+            raise serializers.ValidationError("This purchase order is not open for receiving.")
+        if not attrs["receipts"]:
+            raise serializers.ValidationError({"receipts": "Nothing to receive."})
+        for r in attrs["receipts"]:
+            line = r["line"]
+            if line.purchase_order_id != po.id:
+                raise serializers.ValidationError("A receipt line does not belong to this PO.")
+            if r["quantity"] > line.outstanding:
+                raise serializers.ValidationError(
+                    f"Cannot receive {r['quantity']} of {line.product_name or line.product.name}; "
+                    f"only {line.outstanding} outstanding."
+                )
+        return attrs
+
+    def save(self):
+        po = self.context["purchase_order"]
+        request = self.context["request"]
+        receipts = self.validated_data["receipts"]
+        amount_paid = self.validated_data.get("amount_paid", 0)
+        purchase_date = self.validated_data.get("purchase_date") or timezone.now().date()
+
+        with transaction.atomic():
+            locked_po = PurchaseOrder.objects.select_for_update().get(pk=po.pk)
+
+            # Build the restock via the existing, proven Purchase path — the
+            # ONE code path that moves stock (§6.2).
+            items = [
+                {"product": r["line"].product.pk, "quantity": r["quantity"], "unit_cost": r["line"].unit_cost}
+                for r in receipts
+            ]
+            purchase_ser = PurchaseSerializer(
+                data={"supplier": locked_po.supplier_id, "purchase_date": str(purchase_date),
+                      "items": items, "amount_paid": amount_paid},
+                context={"request": request},
+            )
+            purchase_ser.is_valid(raise_exception=True)
+            purchase = purchase_ser.save()
+
+            # Link the receipt to its PO and advance received quantities.
+            purchase.purchase_order = locked_po
+            purchase.save(update_fields=["purchase_order", "updated_at", "version"])
+            write_outbox_entry(instance=purchase, operation=OutboxEntry.UPDATE, branch_id=purchase.branch_id)
+
+            for r in receipts:
+                line = PurchaseOrderLineItem.objects.select_for_update().get(pk=r["line"].pk)
+                line.quantity_received = line.quantity_received + r["quantity"]
+                line.save(update_fields=["quantity_received", "updated_at", "version"])
+                write_outbox_entry(instance=line, operation=OutboxEntry.UPDATE, branch_id=line.branch_id)
+
+            locked_po.recompute_status()
+            locked_po.save(update_fields=["status", "updated_at", "version"])
+            write_outbox_entry(instance=locked_po, operation=OutboxEntry.UPDATE, branch_id=locked_po.branch_id)
+
+        return locked_po

@@ -16,6 +16,7 @@ import ProductGrid from "./ProductGrid";
 import Cart from "./Cart";
 import PaymentPanel from "./PaymentPanel";
 import HeldSalesDrawer from "./HeldSalesDrawer";
+import CameraScanModal from "./CameraScanModal";
 import BrokeredItemForm from "./BrokeredItemForm";
 import ApprovalPrompt from "./ApprovalPrompt";
 import CustomerPicker from "./CustomerPicker";
@@ -40,6 +41,7 @@ export default function POSScreen() {
   const [category, setCategory] = useState(null);
   const [view, setView] = useState("grid");
   const [showHeldDrawer, setShowHeldDrawer] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState(null);
   const [momoReference, setMomoReference] = useState("");
   const [momoConfirmed, setMomoConfirmed] = useState(false);
@@ -126,7 +128,8 @@ export default function POSScreen() {
       action === null &&
       brokeredProduct === null &&
       approvalKind === null &&
-      !showCustomerPicker,
+      !showCustomerPicker &&
+      !cameraOpen,
   });
 
   const categories = useMemo(() => {
@@ -302,6 +305,14 @@ export default function POSScreen() {
                   }
                 >
                   ⌗ {scanEnabled ? "scan on" : "scan off"}
+                </button>
+                <button
+                  type="button"
+                  className="pos-icon-btn"
+                  onClick={() => setCameraOpen(true)}
+                  title="Scan a barcode with the camera"
+                >
+                  📷 camera
                 </button>
                 <button type="button" className="pos-icon-btn pos-held-btn" onClick={() => setShowHeldDrawer(true)}>
                   ⏸ {heldSales?.length ?? 0} held
@@ -512,6 +523,10 @@ export default function POSScreen() {
           <span className="pos-badge">Stock: OK</span>
         </div>
       </div>
+
+      {cameraOpen && (
+        <CameraScanModal onScan={handleScan} onClose={() => setCameraOpen(false)} />
+      )}
 
       {showHeldDrawer && (
         <HeldSalesDrawer

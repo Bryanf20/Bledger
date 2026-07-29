@@ -77,6 +77,18 @@ class Purchase(BaseModel):
         related_name="purchases_recorded",
     )
 
+    # A Purchase may be the receipt of a PurchaseOrder (Phase 2 design §6.2).
+    # Nullable: a walk-in "one-action restock" has no PO. Receiving a PO
+    # creates a normal Purchase (this link set) through the same, single
+    # stock-moving code path — POs themselves never touch stock.
+    purchase_order = models.ForeignKey(
+        "suppliers.PurchaseOrder",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="receipts",
+    )
+
     class Meta(BaseModel.Meta):
         ordering = ["-purchase_date", "-created_at"]
 
@@ -131,4 +143,97 @@ class PurchasePayment(BaseModel):
 
     def __str__(self):
         return f"{self.amount} XAF toward {self.purchase} on {self.payment_date}"
-    
+
+
+class PurchaseOrder(BaseModel):
+    """
+    An order placed with a supplier for goods that have NOT yet arrived
+    (Phase 2 design §6.2). Distinct from Purchase, which records goods that
+    already arrived and immediately moves stock: a PurchaseOrder touches no
+    stock at all. Receiving one (fully or partially) creates a normal
+    Purchase linked back here, so there stays exactly one code path that
+    increments stock — the proven select_for_update() Purchase path.
+    """
+
+    DRAFT = "draft"
+    SENT = "sent"
+    PARTIALLY_RECEIVED = "partially_received"
+    RECEIVED = "received"
+    CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (DRAFT, "Draft"),
+        (SENT, "Sent"),
+        (PARTIALLY_RECEIVED, "Partially received"),
+        (RECEIVED, "Received"),
+        (CANCELLED, "Cancelled"),
+    ]
+
+    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, related_name="purchase_orders")
+    order_date = models.DateField()
+    expected_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=DRAFT)
+    notes = models.TextField(blank=True, default="")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="purchase_orders_created",
+    )
+
+    class Meta(BaseModel.Meta):
+        ordering = ["-order_date", "-created_at"]
+
+    def __str__(self):
+        return f"PO to {self.supplier.name} on {self.order_date} ({self.status})"
+
+    @property
+    def total_ordered_amount(self):
+        return sum(li.line_total for li in self.line_items.all())
+
+    @property
+    def is_open(self):
+        return self.status in (self.DRAFT, self.SENT, self.PARTIALLY_RECEIVED)
+
+    def recompute_status(self):
+        """
+        Derive status from receipts (§6.2 — partial receipt is the case that
+        matters). Never downgrades a manual state: a cancelled PO stays
+        cancelled, and a PO with no receipts keeps its draft/sent status.
+        """
+        if self.status == self.CANCELLED:
+            return
+        lines = list(self.line_items.all())
+        if not lines:
+            return
+        ordered = sum(li.quantity_ordered for li in lines)
+        received = sum(li.quantity_received for li in lines)
+        if received <= 0:
+            return
+        self.status = self.RECEIVED if received >= ordered else self.PARTIALLY_RECEIVED
+
+
+class PurchaseOrderLineItem(BaseModel):
+    purchase_order = models.ForeignKey(
+        PurchaseOrder, on_delete=models.CASCADE, related_name="line_items"
+    )
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="po_line_items")
+    # Name snapshot at order time, same convention as PurchaseLineItem (§7A.1).
+    product_name = models.CharField(max_length=150, blank=True, default="")
+    quantity_ordered = models.PositiveIntegerField()
+    # Accumulates across partial receipts; status derives from it (§6.2).
+    quantity_received = models.PositiveIntegerField(default=0)
+    unit_cost = models.PositiveIntegerField()
+
+    class Meta(BaseModel.Meta):
+        pass
+
+    def __str__(self):
+        return f"{self.product_name or self.product.name} x{self.quantity_ordered}"
+
+    @property
+    def line_total(self):
+        return self.quantity_ordered * self.unit_cost
+
+    @property
+    def outstanding(self):
+        return max(self.quantity_ordered - self.quantity_received, 0)

@@ -61,3 +61,37 @@ export async function recordPurchasePayment(purchaseId, payload) {
   const { data } = await apiClient.post(`/purchases/${purchaseId}/record-payment/`, payload);
   return data; // Purchase
 }
+
+// ---------------------------------------------------------------------------
+// Purchase orders (Phase 2 §6) — verified against PurchaseOrderViewSet.
+//   GET/POST /purchase-orders/                         (Manager+)
+//   POST /purchase-orders/{id}/receive/  { receipts:[{line,quantity}], purchase_date?, amount_paid? }
+//   POST /purchase-orders/{id}/send/     (draft -> sent)
+//   POST /purchase-orders/{id}/cancel/
+// A PO never moves stock; receiving creates a Purchase (the one stock path).
+// Same "fetch all, filter client-side by supplier" convention as purchases.
+// ---------------------------------------------------------------------------
+export async function fetchPurchaseOrders() {
+  const { data } = await apiClient.get("/purchase-orders/", { params: { page_size: 1000 } });
+  return data.results;
+}
+
+export async function createPurchaseOrder(payload) {
+  const { data } = await apiClient.post("/purchase-orders/", payload);
+  return data;
+}
+
+export async function receivePurchaseOrder(id, payload) {
+  const { data } = await apiClient.post(`/purchase-orders/${id}/receive/`, payload);
+  return data;
+}
+
+export async function sendPurchaseOrder(id) {
+  const { data } = await apiClient.post(`/purchase-orders/${id}/send/`);
+  return data;
+}
+
+export async function cancelPurchaseOrder(id) {
+  const { data } = await apiClient.post(`/purchase-orders/${id}/cancel/`);
+  return data;
+}

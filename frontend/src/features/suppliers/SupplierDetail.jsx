@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import XAFAmount from "../../components/XAFAmount";
 import InlineConfirm from "../../components/InlineConfirm";
-import { useUpdateSupplier } from "../../hooks/useSuppliers";
+import { usePurchaseOrders, useUpdateSupplier } from "../../hooks/useSuppliers";
 import { SupplierInactiveBadge } from "./SupplierBadges";
 import PurchaseHistoryTable from "./PurchaseHistoryTable";
 import RecordPurchaseForm from "./RecordPurchaseForm";
 import PurchaseDetailPanel from "./PurchaseDetailPanel";
+import PurchaseOrdersTab from "./PurchaseOrdersTab";
 
 function formatDate(isoDate) {
   const d = new Date(`${isoDate}T00:00:00`);
@@ -27,9 +28,15 @@ function formatDate(isoDate) {
 // reopened.
 export default function SupplierDetail({ supplier, purchases, isLoading, onEditSupplier, onBack, onSuccess, onError }) {
   const [showForm, setShowForm] = useState(false);
+  const [tab, setTab] = useState("purchases");
   const [viewingPurchaseId, setViewingPurchaseId] = useState(null);
   const [confirmingDeactivate, setConfirmingDeactivate] = useState(false);
   const updateSupplier = useUpdateSupplier();
+  const { data: allPurchaseOrders } = usePurchaseOrders();
+  const purchaseOrders = useMemo(
+    () => (allPurchaseOrders ?? []).filter((po) => po.supplier === supplier?.id),
+    [allPurchaseOrders, supplier],
+  );
 
   const stats = useMemo(() => {
     const unpaidCount = purchases.filter((p) => p.payment_status !== "paid").length;
@@ -111,7 +118,7 @@ export default function SupplierDetail({ supplier, purchases, isLoading, onEditS
             className="sup-hdr-btn"
             disabled={!supplier.is_active}
             title={supplier.is_active ? undefined : "Reactivate this supplier to record a purchase."}
-            onClick={() => setShowForm((v) => !v)}
+            onClick={() => { setTab("purchases"); setShowForm((v) => !v); }}
           >
             {showForm ? "Cancel" : "+ Record purchase"}
           </button>
@@ -134,16 +141,44 @@ export default function SupplierDetail({ supplier, purchases, isLoading, onEditS
       </div>
 
       <div className="sup-detail-scroll">
-        <PurchaseHistoryTable purchases={purchases} onSelectPurchase={(p) => setViewingPurchaseId(p.id)} />
+        <div className="sup-tabs">
+          <button
+            type="button"
+            className={`sup-tab${tab === "purchases" ? " active" : ""}`}
+            onClick={() => setTab("purchases")}
+          >
+            Purchases
+          </button>
+          <button
+            type="button"
+            className={`sup-tab${tab === "orders" ? " active" : ""}`}
+            onClick={() => { setTab("orders"); setShowForm(false); }}
+          >
+            Purchase orders
+          </button>
+        </div>
 
-        {showForm && (
-          <RecordPurchaseForm
+        {tab === "purchases" ? (
+          <>
+            <PurchaseHistoryTable purchases={purchases} onSelectPurchase={(p) => setViewingPurchaseId(p.id)} />
+
+            {showForm && (
+              <RecordPurchaseForm
+                supplier={supplier}
+                onCancel={() => setShowForm(false)}
+                onSuccess={(message) => {
+                  setShowForm(false);
+                  onSuccess(message);
+                }}
+                onError={onError}
+              />
+            )}
+          </>
+        ) : (
+          <PurchaseOrdersTab
             supplier={supplier}
-            onCancel={() => setShowForm(false)}
-            onSuccess={(message) => {
-              setShowForm(false);
-              onSuccess(message);
-            }}
+            purchaseOrders={purchaseOrders}
+            onSuccess={onSuccess}
             onError={onError}
           />
         )}

@@ -17,5 +17,6 @@ router.include_format_suffixes = False
 
 router.register("suppliers", views.SupplierViewSet, basename="supplier")
 router.register("purchases", views.PurchaseViewSet, basename="purchase")
+router.register("purchase-orders", views.PurchaseOrderViewSet, basename="purchase-order")
 
 urlpatterns = router.urls

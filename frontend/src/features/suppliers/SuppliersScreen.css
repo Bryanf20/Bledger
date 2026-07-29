@@ -642,3 +642,165 @@
   background: var(--color-background-warning);
   color: var(--color-text-warning);
 }
+
+/* Purchases / Purchase orders tabs + PO workflow (Phase 2 §6). */
+.sup-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  margin-bottom: 10px;
+}
+.sup-tab {
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.sup-tab.active {
+  color: var(--color-text-primary);
+  font-weight: 600;
+  border-bottom-color: var(--color-brand-primary, #1f6feb);
+}
+
+.po-tab-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.po-tab-title {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.po-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--color-text-tertiary);
+}
+
+.po-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.po-card {
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 12px 14px;
+}
+.po-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.po-card-date {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+.po-card-total {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.po-card-progress {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.po-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.po-status {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.po-status-draft { background: var(--color-background-secondary); color: var(--color-text-tertiary); }
+.po-status-sent { background: rgba(31,111,235,0.14); color: var(--color-brand-primary, #1f6feb); }
+.po-status-partially_received { background: rgba(240,183,76,0.18); color: var(--color-text-warning); }
+.po-status-received { background: rgba(94,217,168,0.18); color: var(--color-text-success); }
+.po-status-cancelled { background: var(--color-background-secondary); color: var(--color-text-danger); }
+
+.po-form,
+.po-receive {
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 12px 14px;
+  margin-top: 10px;
+  background: var(--color-background-secondary);
+}
+.po-form-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.po-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.po-field-label {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+.po-input {
+  padding: 7px 9px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-sm);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-size: 13px;
+}
+.po-line {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+.po-line-product { flex: 1; }
+.po-line-qty { width: 80px; }
+.po-line-cost { width: 110px; }
+.po-line-remove {
+  border: none;
+  background: none;
+  color: var(--color-text-tertiary);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.po-add-line {
+  margin-top: 8px;
+  border: none;
+  background: none;
+  color: var(--color-brand-primary, #1f6feb);
+  font-size: 12px;
+  cursor: pointer;
+}
+.po-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.po-total { font-size: 13px; color: var(--color-text-secondary); }
+.po-form-actions { display: flex; gap: 8px; }
+
+.po-receive-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.po-receive-name { flex: 1; color: var(--color-text-primary); font-size: 13px; }
+.po-receive-out { font-size: 12px; color: var(--color-text-tertiary); }

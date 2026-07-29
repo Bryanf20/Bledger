@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  cancelPurchaseOrder,
+  createPurchaseOrder,
+  fetchPurchaseOrders,
+  receivePurchaseOrder,
+  sendPurchaseOrder, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createPurchase,
   createSupplier,
@@ -73,5 +78,45 @@ export function useRecordPurchasePayment() {
   return useMutation({
     mutationFn: ({ purchaseId, payload }) => recordPurchasePayment(purchaseId, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["purchases"] }),
+  });
+}
+
+
+// Purchase orders (Phase 2 §6). Same fetch-all convention; the tab filters by
+// supplier client-side.
+export function usePurchaseOrders() {
+  return useQuery({ queryKey: ["purchase-orders"], queryFn: fetchPurchaseOrders, staleTime: 30_000 });
+}
+
+export function useCreatePurchaseOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createPurchaseOrder,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["purchase-orders"] }),
+  });
+}
+
+// Receiving creates a Purchase and moves stock, so it invalidates the same
+// caches useCreatePurchase does, plus the PO list.
+export function useReceivePurchaseOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }) => receivePurchaseOrder(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["purchases"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+    },
+  });
+}
+
+// Send (draft -> sent) and cancel share one mutation keyed by action.
+export function usePurchaseOrderTransition() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action }) =>
+      action === "send" ? sendPurchaseOrder(id) : cancelPurchaseOrder(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["purchase-orders"] }),
   });
 }

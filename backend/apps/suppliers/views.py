@@ -16,9 +16,17 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.core.permissions import IsManagerOrOwner
+from apps.sync.models import OutboxEntry
+from apps.sync.utils import write_outbox_entry
 
-from .models import Purchase, Supplier
-from .serializers import PurchaseSerializer, RecordPurchasePaymentSerializer, SupplierSerializer
+from .models import Purchase, PurchaseOrder, Supplier
+from .serializers import (
+    PurchaseOrderSerializer,
+    PurchaseSerializer,
+    ReceivePurchaseOrderSerializer,
+    RecordPurchasePaymentSerializer,
+    SupplierSerializer,
+)
 
 
 class BranchScopedQuerysetMixin:
@@ -97,4 +105,66 @@ class PurchaseViewSet(BranchScopedQuerysetMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         updated_purchase = serializer.save()
         return Response(PurchaseSerializer(updated_purchase, context={"request": request}).data)
-    
+
+
+class PurchaseOrderViewSet(BranchScopedQuerysetMixin, viewsets.ModelViewSet):
+    """
+    GET/POST /purchase-orders/ (Phase 2 design §6). Manager+, like the rest of
+    this app. A PO touches no stock; goods enter through the `receive` action,
+    which creates a normal Purchase (the single stock-moving path). No general
+    PATCH/DELETE — state changes go through the send / cancel / receive
+    actions, keeping status transitions auditable.
+    """
+
+    serializer_class = PurchaseOrderSerializer
+    queryset = PurchaseOrder.objects.select_related("supplier", "created_by").prefetch_related(
+        "line_items__product", "receipts"
+    )
+    permission_classes = [IsAuthenticated, IsManagerOrOwner]
+    http_method_names = ["get", "post", "head", "options"]
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
+
+    def _transition(self, request, target, allowed_from):
+        po = self.get_object()
+        if po.status not in allowed_from:
+            return Response(
+                {"detail": f"A {po.status} purchase order can't move to {target}."},
+                status=400,
+            )
+        po.status = target
+        po.save(update_fields=["status", "updated_at", "version"])
+        write_outbox_entry(instance=po, operation=OutboxEntry.UPDATE, branch_id=po.branch_id)
+        return Response(PurchaseOrderSerializer(po, context={"request": request}).data)
+
+    @action(detail=True, methods=["post"], url_path="send")
+    def send(self, request, pk=None):
+        """POST /purchase-orders/{id}/send/ — draft -> sent."""
+        return self._transition(request, PurchaseOrder.SENT, {PurchaseOrder.DRAFT})
+
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel(self, request, pk=None):
+        """POST /purchase-orders/{id}/cancel/ — cancel an open PO."""
+        return self._transition(
+            request,
+            PurchaseOrder.CANCELLED,
+            {PurchaseOrder.DRAFT, PurchaseOrder.SENT, PurchaseOrder.PARTIALLY_RECEIVED},
+        )
+
+    @action(detail=True, methods=["post"], url_path="receive")
+    def receive(self, request, pk=None):
+        """
+        POST /purchase-orders/{id}/receive/
+          { receipts: [{ line, quantity }], purchase_date?, amount_paid? }
+        Creates a Purchase for the received goods, links it, advances the PO.
+        """
+        po = self.get_object()
+        serializer = ReceivePurchaseOrderSerializer(
+            data=request.data, context={"purchase_order": po, "request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        updated = serializer.save()
+        return Response(PurchaseOrderSerializer(updated, context={"request": request}).data)
